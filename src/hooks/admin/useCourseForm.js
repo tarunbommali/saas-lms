@@ -40,7 +40,10 @@ export const useCourseForm = (initialState) => {
   const validateFormAndUpdate = useCallback(() => {
     const newErrors = validateForm(formData);
     setErrors(newErrors);
-    return Object.keys(newErrors)?.length === 0;
+    return {
+      isValid: Object.keys(newErrors ?? {})?.length === 0,
+      errors: newErrors,
+    };
   }, [formData]);
 
   return {

@@ -1,6 +1,5 @@
-/* eslint-disable no-unused-vars */
-import React, { createContext, useContext, useMemo, useCallback } from 'react';
-import { useAuth } from './AuthContext';
+import { createContext, useContext, useMemo, useCallback } from 'react';
+import { useAuth } from './AuthContext.jsx';
 import {
   useRealtimeCourses,
   useRealtimeUserEnrollments,
@@ -10,7 +9,7 @@ import {
   useRealtimeCoupons,
   useRealtimeCourseMutations,
   useRealtimeEnrollmentMutations
-} from '../hooks/useRealtimeFirebase';
+} from '../hooks/useRealtimeApi.js';
 
 const RealtimeContext = createContext(undefined);
 
@@ -155,9 +154,38 @@ export const RealtimeProvider = ({ children }) => {
     return adminPayments?.slice(0, limit) || [];
   }, [adminPayments]);
 
+  const parseDate = useCallback((value) => {
+    if (!value) return null;
+    if (value instanceof Date) return value;
+    if (typeof value === 'number') return new Date(value);
+    if (typeof value === 'string') return new Date(value);
+    if (value && typeof value === 'object') {
+      if (typeof value.toDate === 'function') return value.toDate();
+      if (typeof value.seconds === 'number') return new Date(value.seconds * 1000);
+    }
+    return null;
+  }, []);
+
   const getActiveCoupons = useCallback(() => {
-    return coupons?.filter(c => c.isActive && new Date(c.validUntil?.toDate()) > new Date()) || [];
-  }, [coupons]);
+    if (!Array.isArray(coupons)) return [];
+
+    return coupons.filter((coupon) => {
+      if (coupon?.isActive === false) return false;
+      const expiry = parseDate(
+        coupon?.validUntil ||
+        coupon?.valid_until ||
+        coupon?.expiresAt ||
+        coupon?.expires_at ||
+        coupon?.expiryDate ||
+        coupon?.expiry_date ||
+        coupon?.endDate ||
+        coupon?.end_date
+      );
+
+      if (!expiry) return true;
+      return expiry.getTime() >= Date.now();
+    });
+  }, [coupons, parseDate]);
 
   // ============================================================================
   // CONTEXT VALUE

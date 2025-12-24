@@ -42,6 +42,7 @@ const NavigationMenu = ({ isAdminMode, isAdminUser }) => {
     { id: "users", name: "Users", link: "/admin/users" },
     { id: "courses", name: "Courses", link: "/admin/courses" },
     { id: "coupons", name: "Coupons", link: "/admin/coupons" },
+    {id:"certifications", name:"Certifications", link:"/admin/certifications"},
   ];
 
   const navMenu = isAdminMode ? adminNavMenu : userNavMenu;

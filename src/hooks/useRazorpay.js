@@ -1,11 +1,12 @@
 import { useState, useCallback } from "react";
-import { createEnrollmentWithPayment } from "../firebase/services";
-import { RAZORPAY_KEY_ID } from "../firebase";
+import { createEnrollmentWithPayment } from "../services/index.js";
+
+const RAZORPAY_KEY_ID = import.meta.env.VITE_RAZORPAY_KEY_ID;
 
 /**
  * Custom hook to manage the Razorpay checkout process.
  * It loads the Razorpay SDK script and provides a payment initiation function.
- * @param {object} currentUser - The current Firebase user object (from useAuth).
+ * @param {object} currentUser - The authenticated user object (from useAuth).
  * @param {function} onPaymentSuccess - Callback function to run after successful payment confirmation.
  */
 const useRazorpay = (currentUser, onPaymentSuccess) => {
@@ -60,46 +61,55 @@ const useRazorpay = (currentUser, onPaymentSuccess) => {
 
         handler: async (response) => {
           try {
-            // Create enrollment + payment record in Firestore using batch operation
-            const result = await createEnrollmentWithPayment(
-              {
-                userId: currentUser.uid,
-                courseId: paymentDetails.courseId,
-                courseTitle: paymentDetails.courseTitle,
-                status: "SUCCESS",
-                paymentData: {
-                  paymentId: response.razorpay_payment_id,
-                  amount: paymentDetails.amount,
-                },
-              },
-              {
-                userId: currentUser.uid,
-                courseId: paymentDetails.courseId,
-                courseTitle: paymentDetails.courseTitle,
-                amount: paymentDetails.amount,
-                currency: "INR",
+            const enrollmentPayload = {
+              courseId: paymentDetails.courseId,
+              courseTitle: paymentDetails.courseTitle,
+              status: "SUCCESS",
+              paymentData: {
+                paymentId: response.razorpay_payment_id,
+                method: "online",
                 status: "captured",
-                razorpayData: {
+                amount: paymentDetails.amount,
+                amountPaid: paymentDetails.amount,
+                couponCode: paymentDetails.coupon || null,
+                couponDiscount: paymentDetails.couponDiscount || 0,
+                razorpay: {
                   paymentId: response.razorpay_payment_id,
                   orderId: response.razorpay_order_id,
                   signature: response.razorpay_signature,
                 },
-              }
-            );
+              },
+              billingInfo: paymentDetails.billingInfo,
+            };
 
-            if (result.success) {
-              // Execute the success callback provided by the component
-              if (onPaymentSuccess) {
-                onPaymentSuccess(result.data.enrollmentId, paymentDetails.courseId);
-              }
-            } else {
-              setError("Payment successful, but failed to record enrollment. Please contact support.");
+            const paymentPayload = {
+              paymentId: response.razorpay_payment_id,
+              orderId: response.razorpay_order_id,
+              courseId: paymentDetails.courseId,
+              amount: paymentDetails.amount,
+              currency: "INR",
+              status: "captured",
+              couponCode: paymentDetails.coupon || null,
+              couponDiscount: paymentDetails.couponDiscount || 0,
+              metadata: {
+                signature: response.razorpay_signature,
+              },
+            };
+
+            const result = await createEnrollmentWithPayment(enrollmentPayload, paymentPayload);
+
+            if (!result?.success) {
+              setError(result?.error || "Payment recorded, but enrollment could not be saved. Please contact support.");
+              return;
+            }
+
+            if (onPaymentSuccess) {
+              const enrollmentId = result.data?.enrollment?.id || result.data?.enrollment?.enrollmentId || null;
+              onPaymentSuccess(enrollmentId, paymentDetails.courseId);
             }
           } catch (err) {
-            setError(
-              "Payment successful, but failed to record enrollment. Please contact support immediately."
-            );
-            console.error("Firestore Enrollment Error:", err);
+            const message = err?.message ? ` (${err.message})` : '';
+            setError(`Payment recorded, but enrollment could not be saved. Please contact support.${message}`);
           } finally {
             setIsLoading(false);
           }
@@ -124,7 +134,6 @@ const useRazorpay = (currentUser, onPaymentSuccess) => {
         setError(
           `Payment failed. Code: ${response.error.code}. Reason: ${response.error.description}`
         );
-        console.error("Razorpay Error:", response.error);
         setIsLoading(false);
       });
 

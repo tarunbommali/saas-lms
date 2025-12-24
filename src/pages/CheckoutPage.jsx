@@ -1,10 +1,6 @@
-/* eslint-disable no-console */
- 
 /* eslint-disable no-unused-vars */
 import React, { useState, useEffect, useCallback } from "react";
 import { useLocation, useNavigate, useParams, Link } from "react-router-dom";
-import { doc, addDoc, collection } from "firebase/firestore";
-import { db } from "../firebase"; // Assuming you have a correct firebase config
 import { Lock, CheckCircle, GraduationCap, X } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext.jsx"; // Assuming this is correct
 import { usePayment } from "../contexts/PaymentContext.jsx"; // Assuming this is correct
@@ -12,6 +8,7 @@ import useRazorpay from "../hooks/useRazorpay"; // Assuming this is correct
 import { global_classnames } from "../utils/classnames.js";
 import { useCourseContext } from "../contexts/CourseContext.jsx"; // Assuming this is correct
 import PageContainer from "../components/layout/PageContainer.jsx";
+import { createEnrollment } from "../services/index.js";
 
 // Define core colors based on established style
 const PRIMARY_BLUE = "#004080";
@@ -262,25 +259,29 @@ const CheckoutPage = () => {
 
     // 🚨 CRITICAL: Check if totalAmount is zero or negative after all discounts
     if (totalAmount <= 0) {
-      // Treat as a successful free/fully discounted enrollment
       try {
-        const enrollmentDoc = await addDoc(collection(db, "enrollments"), {
-          userId: currentUser.uid,
+        const result = await createEnrollment({
           courseId: course.id,
           courseTitle: course.title,
           status: "SUCCESS",
-          paymentId: "FREE_ENROLLMENT_" + Math.random().toString(36).slice(2),
-          amount: 0,
-          coupon: couponValidation.isValid ? couponCode : null,
-          couponDiscount: subtotal + tax,
-          billingInfo,
-          enrolledAt: new Date(),
-          mode: "FREE",
+          paymentData: {
+            method: "free",
+            paymentId: `FREE_ENROLLMENT_${Math.random().toString(36).slice(2)}`,
+            amount: 0,
+            amountPaid: 0,
+            couponCode: couponValidation.isValid ? couponCode : null,
+            couponDiscount: subtotal + tax,
+            billingInfo,
+          },
         });
-        handlePaymentSuccess(enrollmentDoc.id, course.id);
+
+        if (!result.success) {
+          throw new Error(result.error || "Failed to record free enrollment.");
+        }
+
+        handlePaymentSuccess(result.data?.id, course.id);
       } catch (err) {
-        console.error("Free enrollment error", err);
-        setPaymentError("Failed to record free enrollment in database.");
+        setPaymentError(err?.message || "Failed to record free enrollment.");
       }
       return;
     }
@@ -288,34 +289,36 @@ const CheckoutPage = () => {
     // 1. Test payment path (For courses loaded from fallbackData)
     if (useTestPayment) {
       try {
-        const enrollmentDoc = await addDoc(collection(db, "enrollments"), {
-          userId: currentUser.uid,
+        const result = await createEnrollment({
           courseId: course.id,
           courseTitle: course.title,
           status: "SUCCESS",
-          paymentId: "TEST_PAYMENT_" + Math.random().toString(36).slice(2),
-          amount: totalAmount,
-          coupon: couponValidation.isValid ? couponCode : null,
-          couponDiscount,
-          billingInfo,
-          enrolledAt: new Date(),
-          mode: "TEST",
+          paymentData: {
+            method: "test",
+            paymentId: `TEST_PAYMENT_${Math.random().toString(36).slice(2)}`,
+            amount: totalAmount,
+            amountPaid: totalAmount,
+            couponCode: couponValidation.isValid ? couponCode : null,
+            couponDiscount,
+            billingInfo,
+          },
         });
-        handlePaymentSuccess(enrollmentDoc.id, course.id);
+
+        if (!result.success) {
+          throw new Error(result.error || "Failed to record test enrollment.");
+        }
+
+        handlePaymentSuccess(result.data?.id, course.id);
         return;
       } catch (err) {
-        console.error("Test payment enrollment error", err);
-        setPaymentError("Failed to record test enrollment in database.");
+        setPaymentError(err?.message || "Failed to record test enrollment.");
         return;
       }
     }
 
     // 2. 🚀 EXECUTE RAZORPAY PAYMENT 🚀
-    // Convert amount to paise (integer)
-    const amountInPaise = Math.round(totalAmount * 100);
-
     const success = await initializePayment({
-      amount: amountInPaise, // <-- CRITICAL: Amount in PAISE
+      amount: totalAmount,
       currency: "INR",
       courseId: course.id,
       courseTitle: course.title,

@@ -1,12 +1,12 @@
 /* eslint-disable no-unused-vars */
 /* eslint-disable no-console */
 import React, { createContext, useContext, useState, useEffect, useMemo } from 'react';
-import { 
-  getUserPaymentHistory, 
-  validateCouponCode, 
+import {
+  getUserPaymentHistory,
+  validateCouponCode,
   applyCoupon,
-  getAllActiveCoupons 
-} from '../firebase/services';
+  getAllActiveCoupons,
+} from '../services/index.js';
 import { useAuth } from './AuthContext';
 
 const PaymentContext = createContext(undefined);
@@ -128,13 +128,13 @@ export const PaymentProvider = ({ children }) => {
   };
 
   // Apply coupon (this would typically be called during checkout)
-  const applyCouponToOrder = async (couponCode, courseId) => {
+  const applyCouponToOrder = async (couponCode, courseId, amount) => {
     if (!couponCode || !courseId) {
       return { success: false, error: 'Coupon code and course ID are required' };
     }
 
     try {
-      const result = await applyCoupon(couponCode, courseId, currentUser?.uid);
+      const result = await applyCoupon(couponCode, courseId, currentUser?.uid, amount);
       return result;
     } catch (err) {
       console.error('Failed to apply coupon:', err);

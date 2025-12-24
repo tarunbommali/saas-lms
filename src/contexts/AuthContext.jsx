@@ -1,8 +1,48 @@
-import { createContext, useContext, useEffect, useMemo, useState } from 'react';
-import { auth } from '../firebase';
-import { createUserWithEmailAndPassword, onAuthStateChanged, signInWithEmailAndPassword, signOut } from 'firebase/auth';
-import { GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
-import { createOrUpdateUser, getUserProfile, updateUserProfile } from '../firebase/services';
+/* eslint-disable no-console, no-unused-vars */
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import { authApi } from '../api/index.js';
+
+const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID?.trim();
+
+const ensureUserShape = (user) => {
+  if (!user) return null;
+  const normalized = authApi.normalizeUser(user);
+  return {
+    ...normalized,
+    email: normalized.email || '',
+    displayName: normalized.displayName || normalized.firstName || '',
+  };
+};
+
+let googleScriptPromise;
+
+const loadGoogleScript = () => {
+  if (typeof window === 'undefined') {
+    return Promise.reject(new Error('Google Identity Services unavailable'));
+  }
+
+  if (googleScriptPromise) return googleScriptPromise;
+
+  googleScriptPromise = new Promise((resolve, reject) => {
+    if (window.google && window.google.accounts && window.google.accounts.id) {
+      resolve();
+      return;
+    }
+
+    const script = document.createElement('script');
+    script.src = 'https://accounts.google.com/gsi/client';
+    script.async = true;
+    script.defer = true;
+    script.onload = () => {
+      // Small delay to ensure Google SDK initializes
+      setTimeout(resolve, 100);
+    };
+    script.onerror = () => reject(new Error('Failed to load Google Identity Services script'));
+    document.head.appendChild(script);
+  });
+
+  return googleScriptPromise;
+};
 
 const AuthContext = createContext(undefined);
 
@@ -16,128 +56,245 @@ export const AuthProvider = ({ children }) => {
   const [currentUser, setCurrentUser] = useState(null);
   const [userProfile, setUserProfile] = useState(null);
   const [loading, setLoading] = useState(true);
+  const googleInitializedRef = useRef(false);
+  const googleCallbackRef = useRef(null);
 
-  const signup = async (email, password, additionalData = {}) => {
-    const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-    const user = userCredential.user;
-    
-    // Create user profile with enhanced schema
-    const result = await createOrUpdateUser(user, {
-      ...additionalData,
-      isAdmin: Boolean(additionalData.isAdmin)
-    });
-    
-    if (!result.success) {
-      throw new Error(result.error);
+  const applySession = useCallback((payload) => {
+    const normalizedUser = ensureUserShape(payload?.user || payload);
+    if (normalizedUser) {
+      setCurrentUser(normalizedUser);
+      setUserProfile(normalizedUser);
+    } else {
+      setCurrentUser(null);
+      setUserProfile(null);
     }
-    
-    return userCredential;
-  };
+    return normalizedUser;
+  }, []);
 
-  const signin = (email, password) => signInWithEmailAndPassword(auth, email, password);
-  const signinWithGoogle = async () => {
-    const provider = new GoogleAuthProvider();
-    const result = await signInWithPopup(auth, provider);
-    const user = result.user;
-    
-    // Create or update user profile with Google data
-    const profileResult = await createOrUpdateUser(user, {
-      // Google OAuth provides these fields automatically
-      displayName: user.displayName,
-      photoURL: user.photoURL,
-      emailVerified: user.emailVerified
-    });
-    
-    if (!profileResult.success) {
-      /* eslint-disable-next-line no-console */
-      console.error('Failed to create/update user profile:', profileResult.error);
+  const fetchProfile = useCallback(async () => {
+    try {
+      const profile = await authApi.fetchCurrentUser();
+      return applySession(profile);
+    } catch {
+      setCurrentUser(null);
+      setUserProfile(null);
+      return null;
+    } finally {
+      setLoading(false);
     }
-    
-    return result;
-  };
-  const logout = () => signOut(auth);
+  }, [applySession]);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      if (user) {
-        setCurrentUser(user);
-        try {
-          // Fetch user profile using the new service
-          const profileResult = await getUserProfile(user.uid);
-          if (profileResult.success) {
-            const profile = profileResult.data;
-            setUserProfile(profile);
+    fetchProfile();
+  }, [fetchProfile]);
 
-            // Daily learning streak update: if lastLoginAt is not today, increment streak and set lastLoginAt
-            try {
-              const isSameDay = (d1, d2) => {
-                if (!d1 || !d2) return false;
-                const a = d1 && d1.seconds ? new Date(d1.seconds * 1000) : new Date(d1);
-                const b = d2 && d2.seconds ? new Date(d2.seconds * 1000) : new Date(d2);
-                return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
-              };
+  const signup = useCallback(async (email, password, additionalData = {}) => {
+    const result = await authApi.signup({ email, password, ...additionalData });
+    return applySession(result);
+  }, [applySession]);
 
-              const now = new Date();
-              const last = profile.lastLoginAt || profile.updatedAt || null;
-              if (!isSameDay(last, now)) {
-                const newStreak = (profile.learningStreak || 0) + 1;
-                await updateUserProfile(user.uid, { learningStreak: newStreak, lastLoginAt: new Date() });
-                // refresh local copy
-                const refreshed = await getUserProfile(user.uid);
-                if (refreshed.success) setUserProfile(refreshed.data);
-              }
-            } catch (err) {
-              // non blocking
-              // eslint-disable-next-line no-console
-              console.warn('Failed to update learning streak in AuthContext', err);
-            }
-          } else {
-            /* eslint-disable-next-line no-console */
-            console.error('Failed to fetch user profile:', profileResult.error);
-            // Provide minimal offline-safe profile
-            setUserProfile({
-              uid: user.uid,
-              email: user.email,
-              displayName: user.displayName || 'User',
-              isAdmin: false
-            });
-          }
-        } catch (error) {
-          /* eslint-disable-next-line no-console */
-          console.error('Failed to fetch user profile', error);
-          // Provide minimal offline-safe profile
-          setUserProfile({
-            uid: user.uid,
-            email: user.email,
-            displayName: user.displayName || 'User',
-            isAdmin: false
-          });
-        }
-      } else {
-        setCurrentUser(null);
-        setUserProfile(null);
+  const signin = useCallback(async (email, password) => {
+    const result = await authApi.login({ email, password });
+    return applySession(result);
+  }, [applySession]);
+
+  const requestPasswordReset = useCallback(async (email) => authApi.requestPasswordReset(email), []);
+
+  // Handle Google credential response
+  const handleGoogleCredential = useCallback(async (credential) => {
+    try {
+      const result = await authApi.loginWithGoogle(credential);
+      return applySession(result);
+    } catch (error) {
+      console.error('Google sign-in API error:', error);
+      throw error;
+    }
+  }, [applySession]);
+
+  // Initialize Google SDK
+  const initializeGoogle = useCallback(async () => {
+    if (!GOOGLE_CLIENT_ID) {
+      console.warn('Google Client ID not configured');
+      return false;
+    }
+
+    try {
+      await loadGoogleScript();
+
+      const googleAccounts = window.google?.accounts?.id;
+      if (!googleAccounts) {
+        console.error('Google Identity Services not available');
+        return false;
       }
-      setLoading(false);
-    });
-    return unsubscribe;
+
+      if (!googleInitializedRef.current) {
+        googleAccounts.initialize({
+          client_id: GOOGLE_CLIENT_ID,
+          callback: (response) => {
+            if (response?.credential && googleCallbackRef.current) {
+              googleCallbackRef.current(response.credential);
+            }
+          },
+          auto_select: false,
+          cancel_on_tap_outside: true,
+        });
+        googleInitializedRef.current = true;
+      }
+
+      return true;
+    } catch (error) {
+      console.error('Failed to initialize Google:', error);
+      return false;
+    }
   }, []);
+
+  // Sign in with Google using popup/prompt
+  const signinWithGoogle = useCallback(async () => {
+    if (!GOOGLE_CLIENT_ID) {
+      throw new Error('Google client ID is not configured. Add VITE_GOOGLE_CLIENT_ID to your .env file.');
+    }
+
+    const initialized = await initializeGoogle();
+    if (!initialized) {
+      throw new Error('Failed to initialize Google Sign-In');
+    }
+
+    return new Promise((resolve, reject) => {
+      let resolved = false;
+      const timeoutId = setTimeout(() => {
+        if (!resolved) {
+          resolved = true;
+          reject(new Error('Google sign-in timed out. Please try again.'));
+        }
+      }, 60000); // 60 second timeout
+
+      googleCallbackRef.current = async (credential) => {
+        if (resolved) return;
+        resolved = true;
+        clearTimeout(timeoutId);
+
+        try {
+          const user = await handleGoogleCredential(credential);
+          resolve(user);
+        } catch (error) {
+          reject(error);
+        }
+      };
+
+      const googleAccounts = window.google?.accounts?.id;
+
+      // Try to render the Google button in a temporary container or use prompt
+      googleAccounts.prompt((notification) => {
+        if (resolved) return;
+
+        const isNotDisplayed = notification?.isNotDisplayed?.();
+        const isSkipped = notification?.isSkippedMoment?.();
+        const isDismissed = notification?.isDismissedMoment?.();
+
+        if (isNotDisplayed) {
+          // One Tap is not displayed, this is common - user needs to click the button
+          console.log('Google One Tap not displayed, reason:', notification?.getNotDisplayedReason?.());
+          // Don't reject - user can still click the Google button
+        }
+
+        if (isSkipped) {
+          console.log('Google sign-in skipped:', notification?.getSkippedReason?.());
+        }
+
+        if (isDismissed) {
+          const reason = notification?.getDismissedReason?.();
+          if (reason === 'credential_returned') {
+            // Success - credential callback will handle this
+          } else {
+            resolved = true;
+            clearTimeout(timeoutId);
+            reject(new Error(`Google sign-in cancelled: ${reason || 'dismissed'}`));
+          }
+        }
+      });
+    });
+  }, [initializeGoogle, handleGoogleCredential]);
+
+  // Render Google Button in a container element
+  const renderGoogleButton = useCallback(async (containerRef, options = {}) => {
+    if (!GOOGLE_CLIENT_ID || !containerRef) return;
+
+    const initialized = await initializeGoogle();
+    if (!initialized) return;
+
+    const googleAccounts = window.google?.accounts?.id;
+    if (!googleAccounts) return;
+
+    try {
+      googleAccounts.renderButton(containerRef, {
+        type: options.type || 'standard',
+        theme: options.theme || 'outline',
+        size: options.size || 'large',
+        text: options.text || 'continue_with',
+        shape: options.shape || 'rectangular',
+        width: options.width || 300,
+        logo_alignment: options.logoAlignment || 'left',
+      });
+    } catch (error) {
+      console.error('Failed to render Google button:', error);
+    }
+  }, [initializeGoogle]);
+
+  const logout = useCallback(() => {
+    authApi.logoutSession();
+    setCurrentUser(null);
+    setUserProfile(null);
+
+    // Revoke Google session if available
+    if (window.google?.accounts?.id) {
+      try {
+        window.google.accounts.id.disableAutoSelect();
+      } catch (e) {
+        // Ignore errors
+      }
+    }
+  }, []);
+
+  const refreshProfile = useCallback(async () => {
+    setLoading(true);
+    return fetchProfile();
+  }, [fetchProfile]);
+
+  const updateProfile = useCallback(async (updates) => {
+    const result = await authApi.updateProfile(updates);
+    return applySession(result);
+  }, [applySession]);
 
   const value = useMemo(() => ({
     currentUser,
     userProfile,
+    loading,
     signup,
     signin,
     signinWithGoogle,
+    renderGoogleButton,
+    handleGoogleCredential,
     logout,
-    isAuthenticated: Boolean(currentUser),
-    isAdmin: Boolean(userProfile?.isAdmin),
-    loading
-  }), [currentUser, userProfile, loading]);
+    requestPasswordReset,
+    refreshProfile,
+    updateProfile,
+    isGoogleConfigured: Boolean(GOOGLE_CLIENT_ID),
+  }), [
+    currentUser,
+    userProfile,
+    loading,
+    signup,
+    signin,
+    signinWithGoogle,
+    renderGoogleButton,
+    handleGoogleCredential,
+    logout,
+    requestPasswordReset,
+    refreshProfile,
+    updateProfile,
+  ]);
 
-  return (
-    <AuthContext.Provider value={value}>
-      {!loading && children}
-    </AuthContext.Provider>
-  );
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
 
+export default AuthContext;

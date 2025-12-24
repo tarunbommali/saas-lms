@@ -13,6 +13,7 @@ const FormField = ({
   onChange, 
   error, 
   className,
+  inputClassName,
   rows = 3,
   children,
   ...props 
@@ -70,6 +71,7 @@ const FormField = ({
             style={baseStyles}
             className={cn(
               'w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-[var(--focus-ring-color)] transition-colors resize-y min-h-[80px]',
+              inputClassName,
               showError 
                 ? 'border-destructive' 
                 : 'border-border'
@@ -88,6 +90,7 @@ const FormField = ({
             style={baseStyles}
             className={cn(
               'w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-[var(--focus-ring-color)] transition-colors',
+              inputClassName,
               showError 
                 ? 'border-destructive' 
                 : 'border-border'
@@ -112,6 +115,7 @@ const FormField = ({
               }}
               className={cn(
                 'h-4 w-4 focus:ring-[var(--focus-ring-color)] rounded',
+                inputClassName,
                 showError ? 'border-destructive' : 'border-border'
               )}
               {...props}
@@ -147,6 +151,7 @@ const FormField = ({
             style={baseStyles}
             className={cn(
               'w-full px-3 py-2 border outline-none rounded-md focus:ring-2 focus:ring-[var(--focus-ring-color)] transition-colors',
+              inputClassName,
               showError 
                 ? 'border-destructive' 
                 : 'border-border'

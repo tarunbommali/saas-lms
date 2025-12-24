@@ -1,127 +1,70 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
-import { 
-  collection, 
-  query, 
-  where, 
-  orderBy, 
-  limit,
-  onSnapshot,
-  addDoc,
-  updateDoc,
-  doc,
-  serverTimestamp
-} from 'firebase/firestore';
-import { db } from '../firebase';
-import { useAuth } from '../contexts/AuthContext';
+import { useState, useEffect, useCallback } from 'react';
+import { useAuth } from '../contexts/AuthContext.jsx';
 
-// ============================================================================
-// REAL-TIME NOTIFICATIONS HOOK
-// ============================================================================
+const buildNotification = (notification = {}) => ({
+  id: notification.id || (typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `notif_${Date.now()}`),
+  createdAt: notification.createdAt || new Date().toISOString(),
+  isRead: Boolean(notification.isRead),
+  isDeleted: Boolean(notification.isDeleted),
+  ...notification,
+});
 
 export const useRealtimeNotifications = (options = {}) => {
   const { currentUser, isAuthenticated } = useAuth();
   const { limitCount = 50, enabled = true } = options;
-  
+
   const [notifications, setNotifications] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(Boolean(enabled && isAuthenticated));
   const [error, setError] = useState(null);
-  const unsubscribeRef = useRef(null);
+
+  const refresh = useCallback(async () => {
+    if (!enabled || !isAuthenticated || !currentUser?.uid) {
+      setNotifications([]);
+      setLoading(false);
+      setError(null);
+      return [];
+    }
+
+    setLoading(false);
+    setError(null);
+    return [];
+  }, [enabled, isAuthenticated, currentUser?.uid]);
 
   useEffect(() => {
-    if (!enabled || !isAuthenticated || !currentUser?.uid) {
-      setLoading(false);
-      return;
-    }
+    refresh();
+  }, [refresh]);
 
-    setLoading(true);
-    setError(null);
+  const mutateNotifications = useCallback((updater) => {
+    setNotifications((prev) => {
+      const updated = updater(prev);
+      return Array.isArray(updated) ? updated.slice(0, limitCount) : prev;
+    });
+  }, [limitCount]);
 
-    const notificationsRef = collection(db, 'notifications');
-    const q = query(
-      notificationsRef,
-      where('userId', '==', currentUser.uid),
-      orderBy('createdAt', 'desc'),
-      limit(limitCount)
-    );
+  const markAsRead = useCallback((notificationId) => {
+    mutateNotifications((prev) => prev.map((notification) => (
+      notification.id === notificationId
+        ? { ...notification, isRead: true, readAt: new Date().toISOString() }
+        : notification
+    )));
+    return { success: true };
+  }, [mutateNotifications]);
 
-    unsubscribeRef.current = onSnapshot(
-      q,
-      (snapshot) => {
-        const docs = snapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data()
-        }));
-        setNotifications(docs);
-        setLoading(false);
-      },
-      (err) => {
-        console.error('Notifications listener error:', err);
-        setError(err.message);
-        setLoading(false);
-      }
-    );
+  const markAllAsRead = useCallback(() => {
+    mutateNotifications((prev) => prev.map((notification) => ({
+      ...notification,
+      isRead: true,
+      readAt: new Date().toISOString(),
+    })));
+    return { success: true };
+  }, [mutateNotifications]);
 
-    return () => {
-      if (unsubscribeRef.current) {
-        unsubscribeRef.current();
-        unsubscribeRef.current = null;
-      }
-    };
-  }, [currentUser?.uid, isAuthenticated, enabled, limitCount]);
+  const deleteNotification = useCallback((notificationId) => {
+    mutateNotifications((prev) => prev.filter((notification) => notification.id !== notificationId));
+    return { success: true };
+  }, [mutateNotifications]);
 
-  const markAsRead = useCallback(async (notificationId) => {
-    if (!currentUser?.uid) return { success: false, error: 'User not authenticated' };
-
-    try {
-      const notificationRef = doc(db, 'notifications', notificationId);
-      await updateDoc(notificationRef, {
-        isRead: true,
-        readAt: serverTimestamp()
-      });
-      return { success: true };
-    } catch (err) {
-      console.error('Error marking notification as read:', err);
-      return { success: false, error: err.message };
-    }
-  }, [currentUser?.uid]);
-
-  const markAllAsRead = useCallback(async () => {
-    if (!currentUser?.uid) return { success: false, error: 'User not authenticated' };
-
-    try {
-      const unreadNotifications = notifications.filter(n => !n.isRead);
-      const updatePromises = unreadNotifications.map(notification => 
-        updateDoc(doc(db, 'notifications', notification.id), {
-          isRead: true,
-          readAt: serverTimestamp()
-        })
-      );
-      
-      await Promise.all(updatePromises);
-      return { success: true };
-    } catch (err) {
-      console.error('Error marking all notifications as read:', err);
-      return { success: false, error: err.message };
-    }
-  }, [currentUser?.uid, notifications]);
-
-  const deleteNotification = useCallback(async (notificationId) => {
-    if (!currentUser?.uid) return { success: false, error: 'User not authenticated' };
-
-    try {
-      const notificationRef = doc(db, 'notifications', notificationId);
-      await updateDoc(notificationRef, {
-        isDeleted: true,
-        deletedAt: serverTimestamp()
-      });
-      return { success: true };
-    } catch (err) {
-      console.error('Error deleting notification:', err);
-      return { success: false, error: err.message };
-    }
-  }, [currentUser?.uid]);
-
-  const unreadCount = notifications.filter(n => !n.isRead).length;
+  const unreadCount = (notifications || []).filter((notification) => !notification.isRead).length;
 
   return {
     notifications,
@@ -130,94 +73,28 @@ export const useRealtimeNotifications = (options = {}) => {
     unreadCount,
     markAsRead,
     markAllAsRead,
-    deleteNotification
+    deleteNotification,
+    refresh,
   };
 };
-
-// ============================================================================
-// NOTIFICATION CREATION HOOK (Admin use)
-// ============================================================================
 
 export const useNotificationCreator = () => {
-  const { currentUser, isAuthenticated } = useAuth();
-  const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  const createNotification = useCallback(async (notificationData) => {
-    if (!isAuthenticated || !currentUser?.uid) {
-      setError('User not authenticated');
-      return { success: false, error: 'User not authenticated' };
-    }
-
-    setLoading(true);
-    setError(null);
-
-    try {
-      const notificationsRef = collection(db, 'notifications');
-      const notificationPayload = {
-        ...notificationData,
-        createdAt: serverTimestamp(),
-        isRead: false,
-        isDeleted: false
-      };
-
-      const docRef = await addDoc(notificationsRef, notificationPayload);
-      return { success: true, data: { id: docRef.id } };
-    } catch (err) {
-      console.error('Error creating notification:', err);
-      setError(err.message);
-      return { success: false, error: err.message };
-    } finally {
-      setLoading(false);
-    }
-  }, [currentUser?.uid, isAuthenticated]);
-
-  const createBulkNotifications = useCallback(async (notificationsData) => {
-    if (!isAuthenticated || !currentUser?.uid) {
-      setError('User not authenticated');
-      return { success: false, error: 'User not authenticated' };
-    }
-
-    setLoading(true);
-    setError(null);
-
-    try {
-      const notificationsRef = collection(db, 'notifications');
-      const timestamp = serverTimestamp();
-      
-      const notifications = notificationsData.map(data => ({
-        ...data,
-        createdAt: timestamp,
-        isRead: false,
-        isDeleted: false
-      }));
-
-      const promises = notifications.map(notification => 
-        addDoc(notificationsRef, notification)
-      );
-
-      const results = await Promise.all(promises);
-      return { success: true, data: results };
-    } catch (err) {
-      console.error('Error creating bulk notifications:', err);
-      setError(err.message);
-      return { success: false, error: err.message };
-    } finally {
-      setLoading(false);
-    }
-  }, [currentUser?.uid, isAuthenticated]);
+  const unsupported = useCallback(async () => {
+    const message = 'Notifications service is not configured.';
+    setError(message);
+    return { success: false, error: message };
+  }, []);
 
   return {
-    createNotification,
-    createBulkNotifications,
-    loading,
-    error
+    createNotification: unsupported,
+    createBulkNotifications: unsupported,
+    loading: false,
+    error,
+    resetError: () => setError(null),
   };
 };
-
-// ============================================================================
-// NOTIFICATION TYPES AND HELPERS
-// ============================================================================
 
 export const NOTIFICATION_TYPES = {
   ENROLLMENT_SUCCESS: 'enrollment_success',
@@ -227,17 +104,17 @@ export const NOTIFICATION_TYPES = {
   COURSE_UPDATED: 'course_updated',
   NEW_COURSE_AVAILABLE: 'new_course_available',
   COUPON_EXPIRING: 'coupon_expiring',
-  SYSTEM_ANNOUNCEMENT: 'system_announcement'
+  SYSTEM_ANNOUNCEMENT: 'system_announcement',
 };
 
 export const createNotificationData = (type, userId, data = {}) => {
-  const baseData = {
+  const baseData = buildNotification({
     userId,
     type,
-    createdAt: serverTimestamp(),
     isRead: false,
-    isDeleted: false
-  };
+    isDeleted: false,
+    priority: 'low',
+  });
 
   switch (type) {
     case NOTIFICATION_TYPES.ENROLLMENT_SUCCESS:
@@ -247,7 +124,7 @@ export const createNotificationData = (type, userId, data = {}) => {
         message: `You have successfully enrolled in ${data.courseTitle}`,
         actionUrl: `/learn/${data.courseId}`,
         icon: 'book-open',
-        priority: 'high'
+        priority: 'high',
       };
 
     case NOTIFICATION_TYPES.COURSE_COMPLETED:
@@ -257,7 +134,7 @@ export const createNotificationData = (type, userId, data = {}) => {
         message: `Congratulations! You have completed ${data.courseTitle}`,
         actionUrl: `/course/${data.courseId}`,
         icon: 'award',
-        priority: 'high'
+        priority: 'high',
       };
 
     case NOTIFICATION_TYPES.PAYMENT_SUCCESS:
@@ -265,9 +142,9 @@ export const createNotificationData = (type, userId, data = {}) => {
         ...baseData,
         title: 'Payment Successful!',
         message: `Your payment of ₹${data.amount} has been processed successfully`,
-        actionUrl: `/profile`,
+        actionUrl: '/profile',
         icon: 'credit-card',
-        priority: 'medium'
+        priority: 'medium',
       };
 
     case NOTIFICATION_TYPES.PAYMENT_FAILED:
@@ -277,7 +154,7 @@ export const createNotificationData = (type, userId, data = {}) => {
         message: `Your payment for ${data.courseTitle} could not be processed`,
         actionUrl: `/course/${data.courseId}`,
         icon: 'alert-circle',
-        priority: 'high'
+        priority: 'high',
       };
 
     case NOTIFICATION_TYPES.COURSE_UPDATED:
@@ -287,7 +164,7 @@ export const createNotificationData = (type, userId, data = {}) => {
         message: `${data.courseTitle} has been updated with new content`,
         actionUrl: `/course/${data.courseId}`,
         icon: 'refresh-cw',
-        priority: 'medium'
+        priority: 'medium',
       };
 
     case NOTIFICATION_TYPES.NEW_COURSE_AVAILABLE:
@@ -297,7 +174,7 @@ export const createNotificationData = (type, userId, data = {}) => {
         message: `Check out the new course: ${data.courseTitle}`,
         actionUrl: `/course/${data.courseId}`,
         icon: 'star',
-        priority: 'medium'
+        priority: 'medium',
       };
 
     case NOTIFICATION_TYPES.COUPON_EXPIRING:
@@ -305,9 +182,9 @@ export const createNotificationData = (type, userId, data = {}) => {
         ...baseData,
         title: 'Coupon Expiring Soon',
         message: `Your coupon ${data.couponCode} expires in ${data.daysLeft} days`,
-        actionUrl: `/courses`,
+        actionUrl: '/courses',
         icon: 'clock',
-        priority: 'medium'
+        priority: 'medium',
       };
 
     case NOTIFICATION_TYPES.SYSTEM_ANNOUNCEMENT:
@@ -317,7 +194,7 @@ export const createNotificationData = (type, userId, data = {}) => {
         message: data.message,
         actionUrl: data.actionUrl || '/',
         icon: 'megaphone',
-        priority: data.priority || 'low'
+        priority: data.priority || 'low',
       };
 
     default:
@@ -326,7 +203,7 @@ export const createNotificationData = (type, userId, data = {}) => {
         title: 'Notification',
         message: 'You have a new notification',
         icon: 'bell',
-        priority: 'low'
+        priority: 'low',
       };
   }
 };
@@ -335,5 +212,5 @@ export default {
   useRealtimeNotifications,
   useNotificationCreator,
   NOTIFICATION_TYPES,
-  createNotificationData
+  createNotificationData,
 };

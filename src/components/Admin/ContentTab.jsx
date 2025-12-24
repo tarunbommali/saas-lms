@@ -1,7 +1,7 @@
 /* eslint-disable no-unused-vars */
 import React, { useState } from 'react';
 import { Plus, Trash2, BookOpen, Video, ListOrdered, FileText, Link, Image, Download } from 'lucide-react';
-import FormField from '../ui/FormField'; 
+import FormField from '../ui/FormField';
 
 const ContentTab = ({
     modules = [], // Add default value
@@ -28,10 +28,10 @@ const ContentTab = ({
     const addResource = (moduleId, lessonId) => {
         const module = modules.find(m => m.id === moduleId);
         if (!module) return;
-        
+
         const lesson = module.lessons?.find(l => l.id === lessonId);
         if (!lesson) return;
-        
+
         const newResource = {
             id: Date.now().toString(),
             type: 'pdf',
@@ -39,7 +39,7 @@ const ContentTab = ({
             url: '',
             file: null
         };
-        
+
         const updatedResources = [...(lesson.resources || []), newResource];
         handleLessonChange(moduleId, lessonId, { resources: updatedResources });
     };
@@ -47,10 +47,10 @@ const ContentTab = ({
     const deleteResource = (moduleId, lessonId, resourceId) => {
         const module = modules.find(m => m.id === moduleId);
         if (!module) return;
-        
+
         const lesson = module.lessons?.find(l => l.id === lessonId);
         if (!lesson) return;
-        
+
         const updatedResources = (lesson.resources || []).filter(r => r.id !== resourceId);
         handleLessonChange(moduleId, lessonId, { resources: updatedResources });
     };
@@ -58,20 +58,20 @@ const ContentTab = ({
     const handleResourceChange = (moduleId, lessonId, resourceId, updates) => {
         const module = modules.find(m => m.id === moduleId);
         if (!module) return;
-        
+
         const lesson = module.lessons?.find(l => l.id === lessonId);
         if (!lesson) return;
-        
+
         const updatedResources = (lesson.resources || []).map(resource =>
             resource.id === resourceId ? { ...resource, ...updates } : resource
         );
-        
+
         handleLessonChange(moduleId, lessonId, { resources: updatedResources });
     };
 
     const handleFileUpload = (moduleId, lessonId, resourceId, file) => {
         if (!file) return;
-        
+
         const updates = {
             title: file.name,
             url: URL.createObjectURL(file),
@@ -102,17 +102,16 @@ const ContentTab = ({
                         {totalLessons || 0} lessons • {totalDuration || 0} hours total
                     </p>
                 </div>
-                
+
                 <div className="flex items-center gap-4">
                     <div className="flex bg-gray-100 rounded-lg p-1">
                         <button
                             type="button"
                             onClick={() => onContentTypeChange ? onContentTypeChange('modules') : null}
-                            className={`flex items-center gap-2 px-3 py-2 rounded-md transition-colors ${
-                                contentType === 'modules' 
-                                    ? 'bg-white text-blue-600 shadow-sm' 
-                                    : 'text-gray-600 hover:text-gray-900'
-                            }`}
+                            className={`flex items-center gap-2 px-3 py-2 rounded-md transition-colors ${contentType === 'modules'
+                                ? 'bg-white text-blue-600 shadow-sm'
+                                : 'text-gray-600 hover:text-gray-900'
+                                }`}
                         >
                             <BookOpen className="w-4 h-4" />
                             Modules
@@ -120,11 +119,10 @@ const ContentTab = ({
                         <button
                             type="button"
                             onClick={() => onContentTypeChange ? onContentTypeChange('series') : null}
-                            className={`flex items-center gap-2 px-3 py-2 rounded-md transition-colors ${
-                                contentType === 'series' 
-                                    ? 'bg-white text-blue-600 shadow-sm' 
-                                    : 'text-gray-600 hover:text-gray-900'
-                            }`}
+                            className={`flex items-center gap-2 px-3 py-2 rounded-md transition-colors ${contentType === 'series'
+                                ? 'bg-white text-blue-600 shadow-sm'
+                                : 'text-gray-600 hover:text-gray-900'
+                                }`}
                         >
                             <ListOrdered className="w-4 h-4" />
                             Series
@@ -163,7 +161,7 @@ const ContentTab = ({
                 safeModules.map((module, moduleIndex) => {
                     // Safe array access for lessons
                     const safeLessons = Array.isArray(module.lessons) ? module.lessons : [];
-                    
+
                     return (
                         <div key={module.id || moduleIndex} className="border border-gray-200 rounded-lg p-4 mb-4">
                             <div className="flex justify-between items-start mb-4">
@@ -233,7 +231,7 @@ const ContentTab = ({
                                     safeLessons.map((lesson, lessonIndex) => {
                                         // Safe array access for resources
                                         const safeResources = Array.isArray(lesson.resources) ? lesson.resources : [];
-                                        
+
                                         return (
                                             <div key={lesson.id || lessonIndex} className="border border-gray-200 rounded-lg overflow-hidden">
                                                 {/* Lesson Header */}
@@ -316,7 +314,7 @@ const ContentTab = ({
                                                                 Add Resource
                                                             </button>
                                                         </div>
-                                                        
+
                                                         <div className="space-y-2">
                                                             {safeResources.length === 0 ? (
                                                                 <div className="text-center py-4 text-gray-500">
@@ -340,7 +338,7 @@ const ContentTab = ({
                                                                                     <option value="pdf">PDF</option>
                                                                                     <option value="document">Document</option>
                                                                                     <option value="image">Image</option>
-                                                                                    <option value="link">Link</option>
+                                                                                    <option value="link">Task</option>
                                                                                     <option value="notes">Notes</option>
                                                                                 </FormField>
                                                                             </div>

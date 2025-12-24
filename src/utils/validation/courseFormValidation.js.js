@@ -1,4 +1,29 @@
 /* eslint-disable no-unused-vars */
+const toTrimmedString = (value) => {
+  if (value === null || value === undefined) return '';
+  if (typeof value === 'string') return value.trim();
+  if (typeof value === 'number' || typeof value === 'boolean') {
+    return String(value).trim();
+  }
+  if (Array.isArray(value)) {
+    return value
+      .map((item) => toTrimmedString(item))
+      .filter(Boolean)
+      .join(', ')
+      .trim();
+  }
+  if (typeof value === 'object') {
+    return Object.values(value)
+      .map((item) => toTrimmedString(item))
+      .filter(Boolean)
+      .join(' ')
+      .trim();
+  }
+  return '';
+};
+
+const hasContent = (value) => toTrimmedString(value).length > 0;
+
 /**
  * Validates a specific form field
  * @param {string} field - The field name to validate
@@ -11,50 +36,62 @@ export const validateField = (field, value, errors = {}) => {
 
   switch (field) {
     case "title":
-      if (!value?.trim()) {
+      {
+        const trimmed = toTrimmedString(value);
+      if (!trimmed) {
         newErrors.title = "Course title is required";
-      } else if (value?.length < 5) {
+      } else if (trimmed.length < 5) {
         newErrors.title = "Title must be at least 5 characters";
-      } else if (value?.length > 100) {
+      } else if (trimmed.length > 100) {
         newErrors.title = "Title must be less than 100 characters";
       } else {
         delete newErrors.title;
       }
+      }
       break;
 
     case "shortDescription":
-      if (!value?.trim()) {
+      {
+        const trimmed = toTrimmedString(value);
+      if (!trimmed) {
         newErrors.shortDescription = "Short description is required";
-      } else if (value?.length < 10) {
+      } else if (trimmed.length < 10) {
         newErrors.shortDescription = "Short description must be at least 10 characters";
-      } else if (value?.length > 200) {
+      } else if (trimmed.length > 200) {
         newErrors.shortDescription = "Short description must be less than 200 characters";
       } else {
         delete newErrors.shortDescription;
       }
+      }
       break;
 
     case "description":
-      if (!value?.trim()) {
+      {
+        const trimmed = toTrimmedString(value);
+      if (!trimmed) {
         newErrors.description = "Description is required";
-      } else if (value?.length < 50) {
+      } else if (trimmed.length < 50) {
         newErrors.description = "Description must be at least 50 characters";
-      } else if (value?.length > 2000) {
+      } else if (trimmed.length > 2000) {
         newErrors.description = "Description must be less than 2000 characters";
       } else {
         delete newErrors.description;
       }
+      }
       break;
 
     case "instructor":
-      if (!value?.trim()) {
+      {
+        const trimmed = toTrimmedString(value);
+      if (!trimmed) {
         newErrors.instructor = "Instructor name is required";
-      } else if (value?.length < 2) {
+      } else if (trimmed.length < 2) {
         newErrors.instructor = "Instructor name must be at least 2 characters";
-      } else if (value?.length > 50) {
+      } else if (trimmed.length > 50) {
         newErrors.instructor = "Instructor name must be less than 50 characters";
       } else {
         delete newErrors.instructor;
+      }
       }
       break;
 
@@ -89,17 +126,20 @@ export const validateField = (field, value, errors = {}) => {
       break;
 
     case "duration":
-      if (!value?.trim()) {
+      {
+        const trimmed = toTrimmedString(value);
+      if (!trimmed) {
         newErrors.duration = "Duration is required";
-      } else if (value?.length < 2) {
+      } else if (trimmed.length < 2) {
         newErrors.duration = "Duration must be at least 2 characters";
       } else {
         delete newErrors.duration;
       }
+      }
       break;
 
     case "category":
-      if (!value?.trim()) {
+      if (!hasContent(value)) {
         newErrors.category = "Category is required";
       } else {
         delete newErrors.category;
@@ -107,7 +147,7 @@ export const validateField = (field, value, errors = {}) => {
       break;
 
     case "level":
-      if (!value?.trim()) {
+      if (!hasContent(value)) {
         newErrors.level = "Level is required";
       } else {
         delete newErrors.level;
@@ -115,7 +155,7 @@ export const validateField = (field, value, errors = {}) => {
       break;
 
     case "language":
-      if (!value?.trim()) {
+      if (!hasContent(value)) {
         newErrors.language = "Language is required";
       } else {
         delete newErrors.language;
@@ -123,7 +163,7 @@ export const validateField = (field, value, errors = {}) => {
       break;
 
     case "imageUrl":
-      if (value?.trim() && !isValidUrl(value)) {
+      if (hasContent(value) && !isValidUrl(toTrimmedString(value))) {
         newErrors.imageUrl = "Please enter a valid URL for the course image";
       } else {
         delete newErrors.imageUrl;
@@ -131,7 +171,7 @@ export const validateField = (field, value, errors = {}) => {
       break;
 
     case "videoUrl":
-      if (value?.trim() && !isValidUrl(value)) {
+      if (hasContent(value) && !isValidUrl(toTrimmedString(value))) {
         newErrors.videoUrl = "Please enter a valid URL for the promo video";
       } else {
         delete newErrors.videoUrl;
@@ -140,7 +180,7 @@ export const validateField = (field, value, errors = {}) => {
 
     case "requirements":
       if (Array.isArray(value) && value.length > 0) {
-        const invalidRequirements = value.filter(req => !req?.trim());
+        const invalidRequirements = value.filter(req => !hasContent(req));
         if (invalidRequirements.length > 0) {
           newErrors.requirements = "All requirements must have content";
         } else {
@@ -153,7 +193,7 @@ export const validateField = (field, value, errors = {}) => {
 
     case "whatYouLearn":
       if (Array.isArray(value) && value.length > 0) {
-        const invalidLearnings = value.filter(learning => !learning?.trim());
+        const invalidLearnings = value.filter(learning => !hasContent(learning));
         if (invalidLearnings.length > 0) {
           newErrors.whatYouLearn = "All learning points must have content";
         } else {
@@ -166,7 +206,7 @@ export const validateField = (field, value, errors = {}) => {
 
     case "tags":
       if (Array.isArray(value) && value.length > 0) {
-        const invalidTags = value.filter(tag => !tag?.trim());
+        const invalidTags = value.filter(tag => !hasContent(tag));
         if (invalidTags.length > 0) {
           newErrors.tags = "All tags must have content";
         } else if (value.length > 10) {
@@ -207,7 +247,7 @@ export const validateForm = (formData) => {
   ];
 
   requiredFields.forEach((field) => {
-    if (!formData[field]?.trim()) {
+    if (!hasContent(formData[field])) {
       newErrors[field] = `${field.charAt(0).toUpperCase() + field.slice(1)} is required`;
     }
   });
@@ -237,31 +277,31 @@ export const validateForm = (formData) => {
   }
 
   // URL validations
-  if (formData.imageUrl?.trim() && !isValidUrl(formData.imageUrl)) {
+  if (hasContent(formData.imageUrl) && !isValidUrl(toTrimmedString(formData.imageUrl))) {
     newErrors.imageUrl = "Please enter a valid URL for the course image";
   }
 
-  if (formData.videoUrl?.trim() && !isValidUrl(formData.videoUrl)) {
+  if (hasContent(formData.videoUrl) && !isValidUrl(toTrimmedString(formData.videoUrl))) {
     newErrors.videoUrl = "Please enter a valid URL for the promo video";
   }
 
   // Array field validations
   if (Array.isArray(formData.requirements) && formData.requirements.length > 0) {
-    const invalidRequirements = formData.requirements.filter(req => !req?.trim());
+    const invalidRequirements = formData.requirements.filter(req => !hasContent(req));
     if (invalidRequirements.length > 0) {
       newErrors.requirements = "All requirements must have content";
     }
   }
 
   if (Array.isArray(formData.whatYouLearn) && formData.whatYouLearn.length > 0) {
-    const invalidLearnings = formData.whatYouLearn.filter(learning => !learning?.trim());
+    const invalidLearnings = formData.whatYouLearn.filter(learning => !hasContent(learning));
     if (invalidLearnings.length > 0) {
       newErrors.whatYouLearn = "All learning points must have content";
     }
   }
 
   if (Array.isArray(formData.tags) && formData.tags.length > 0) {
-    const invalidTags = formData.tags.filter(tag => !tag?.trim());
+    const invalidTags = formData.tags.filter(tag => !hasContent(tag));
     if (invalidTags.length > 0) {
       newErrors.tags = "All tags must have content";
     } else if (formData.tags.length > 10) {
@@ -270,19 +310,19 @@ export const validateForm = (formData) => {
   }
 
   // Custom business logic validations
-  if (formData.shortDescription?.length > 200) {
+  if (toTrimmedString(formData.shortDescription).length > 200) {
     newErrors.shortDescription = "Short description must be less than 200 characters";
   }
 
-  if (formData.description?.length > 2000) {
+  if (toTrimmedString(formData.description).length > 2000) {
     newErrors.description = "Description must be less than 2000 characters";
   }
 
-  if (formData.title?.length > 100) {
+  if (toTrimmedString(formData.title).length > 100) {
     newErrors.title = "Title must be less than 100 characters";
   }
 
-  if (formData.instructor?.length > 50) {
+  if (toTrimmedString(formData.instructor).length > 50) {
     newErrors.instructor = "Instructor name must be less than 50 characters";
   }
 
@@ -297,17 +337,19 @@ export const validateForm = (formData) => {
 export const validateModule = (module) => {
   const errors = {};
 
-  if (!module.title?.trim()) {
+  const trimmedTitle = toTrimmedString(module.title);
+  if (!trimmedTitle) {
     errors.title = "Module title is required";
-  } else if (module.title.length < 2) {
+  } else if (trimmedTitle.length < 2) {
     errors.title = "Module title must be at least 2 characters";
   }
 
-  if (!module.duration?.trim()) {
+  if (!hasContent(module.duration)) {
     errors.duration = "Module duration is required";
   }
 
-  if (module.order <= 0) {
+  const moduleOrder = Number(module.order);
+  if (!Number.isFinite(moduleOrder) || moduleOrder <= 0) {
     errors.order = "Module order must be greater than 0";
   }
 
@@ -322,25 +364,27 @@ export const validateModule = (module) => {
 export const validateLesson = (lesson) => {
   const errors = {};
 
-  if (!lesson.title?.trim()) {
+  const trimmedTitle = toTrimmedString(lesson.title);
+  if (!trimmedTitle) {
     errors.title = "Lesson title is required";
-  } else if (lesson.title.length < 2) {
+  } else if (trimmedTitle.length < 2) {
     errors.title = "Lesson title must be at least 2 characters";
   }
 
-  if (!lesson.duration?.trim()) {
+  if (!hasContent(lesson.duration)) {
     errors.duration = "Lesson duration is required";
   }
 
-  if (!lesson.type?.trim()) {
+  if (!hasContent(lesson.type)) {
     errors.type = "Lesson type is required";
   }
 
-  if (!lesson.content?.trim()) {
+  if (!hasContent(lesson.content)) {
     errors.content = "Lesson content is required";
   }
 
-  if (lesson.order <= 0) {
+  const lessonOrder = Number(lesson.order);
+  if (!Number.isFinite(lessonOrder) || lessonOrder <= 0) {
     errors.order = "Lesson order must be greater than 0";
   }
 
@@ -364,7 +408,7 @@ export const validateModules = (modules) => {
     }
 
     // Validate lessons in this module
-    module.lessons.forEach((lesson, lessonIndex) => {
+  (Array.isArray(module.lessons) ? module.lessons : []).forEach((lesson, lessonIndex) => {
       const lessonErrors = validateLesson(lesson);
       if (Object.keys(lessonErrors).length > 0) {
         if (!errors[module.id]) {

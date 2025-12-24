@@ -85,7 +85,7 @@ const CoursePage = () => {
           students: course.totalEnrollments || 0,
 
           // Visual
-          imageUrl: course.imageUrl || "/api/placeholder/400/250",
+          imageUrl: course.imageUrl || "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSUwCJYSnbBLMEGWKfSnWRGC_34iCCKkxePpg&s",
 
           // Course modules
           modules: transformedModules,

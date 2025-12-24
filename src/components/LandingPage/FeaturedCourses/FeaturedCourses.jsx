@@ -1,59 +1,74 @@
 /* eslint-disable no-unused-vars */
-import { useState, useRef, useEffect } from "react";
+import { useMemo } from "react";
+import { useRealtime } from "../../../contexts/RealtimeContext";
+import { useAuth } from "../../../contexts/AuthContext";
 import PageContainer from "../../layout/PageContainer.jsx";
-import { BookOpen, ChevronLeft, ChevronRight } from "lucide-react";
-import { motion, AnimatePresence } from "framer-motion";
+import { BookOpen } from "lucide-react";
+import { motion } from "framer-motion";
 import { courses as fallbackCourses } from "../../../data/landingPage/coursesData.js";
-import { containerVariants } from "../../../data/landingPage/animationVariants.js";
 import AnimatedSectionHeader from "../ui/AnimatedSectionHeader.jsx";
-import FeaturedCourseCard from "./FeaturedCourseCard.jsx";
-// FeaturedCourseCard component
+import CourseList from "../../Course/CourseList";
 
 const FeaturedCourses = ({ courses }) => {
-  const courseList =
-    Array.isArray(courses) && courses.length > 0 ? courses : fallbackCourses;
-  const [hoveredCourse, setHoveredCourse] = useState(null);
-  const scrollContainerRef = useRef(null);
-  const [showLeftArrow, setShowLeftArrow] = useState(false);
-  const [showRightArrow, setShowRightArrow] = useState(true);
+  // Prefer courses passed as prop. If not provided, use realtime context so
+  // the landing page shows the same course list the app uses elsewhere.
+  const { courses: contextCourses, coursesLoading } = useRealtime();
 
-  const scroll = (direction) => {
-    const container = scrollContainerRef.current;
-    if (!container) return;
+  const courseList = useMemo(() => {
+    // Normalize incoming courses (could be raw Firestore docs or plain objects)
+    const rawList =
+      Array.isArray(courses) && courses.length > 0
+        ? courses
+        : Array.isArray(contextCourses) && contextCourses.length > 0
+          ? contextCourses
+          : fallbackCourses;
 
-    const scrollAmount = 400;
-    const newScrollLeft =
-      container.scrollLeft +
-      (direction === "right" ? scrollAmount : -scrollAmount);
+    return rawList
+      .map((c, index) => {
+        const data = typeof c?.data === "function" ? c.data() : c?.data || c;
+        const derivedId =
+          data?.id ||
+          c?.id ||
+          data?.courseId ||
+          data?.uid ||
+          (typeof data?.slug === "string" ? data.slug : undefined) ||
+          `fallback-${index}`;
 
-    container.scrollTo({
-      left: newScrollLeft,
-      behavior: "smooth",
-    });
-
-    setTimeout(updateArrowVisibility, 300);
-  };
-
-  const updateArrowVisibility = () => {
-    const container = scrollContainerRef.current;
-    if (!container) return;
-
-    const { scrollLeft, scrollWidth, clientWidth } = container;
-    setShowLeftArrow(scrollLeft > 0);
-    setShowRightArrow(scrollLeft < scrollWidth - clientWidth - 10);
-  };
-
-  useEffect(() => {
-    updateArrowVisibility();
-
-    const container = scrollContainerRef.current;
-    if (container) {
-      container.addEventListener("scroll", updateArrowVisibility);
-      return () =>
-        container.removeEventListener("scroll", updateArrowVisibility);
+        return {
+          id: derivedId,
+          title: data?.title || data?.name || "Untitled Course",
+          description: data?.description || data?.excerpt || "",
+          imageUrl: data?.imageUrl || data?.image || data?.thumbnail || "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSUwCJYSnbBLMEGWKfSnWRGC_34iCCKkxePpg&s",
+          featured: Boolean(data?.featured),
+          category: data?.category || "General",
+          level: data?.level || "Beginner",
+          duration: data?.duration || data?.hours || "—",
+          students: data?.totalEnrollments || data?.students || 0,
+          rating: data?.averageRating || data?.rating || "4.8",
+          price: typeof data?.price !== "undefined" ? data.price : data?.paidAmount || "Free",
+          originalPrice: data?.originalPrice || data?.mrp || "",
+          gradient: data?.gradient || "from-primary/40 to-primary/60",
+          isPublished: data?.isPublished === undefined ? true : Boolean(data?.isPublished),
+        };
+      })
+      .filter((c) => c.isPublished);
+  }, [contextCourses, courses]);
+  const { currentUser, isAuthenticated } = useAuth();
+  const { isEnrolled } = useRealtime();
+  const enrollmentStatus = useMemo(() => {
+    if (!isAuthenticated || !currentUser || !courseList.length) {
+      return {};
     }
-  }, []);
 
+    return courseList.reduce((acc, course) => {
+      try {
+        acc[course.id] = Boolean(isEnrolled(course.id));
+      } catch {
+        acc[course.id] = false;
+      }
+      return acc;
+    }, {});
+  }, [courseList, currentUser, isAuthenticated, isEnrolled]);
   return (
     <section className="py-20 relative overflow-hidden">
       {/* Animated Background */}
@@ -92,73 +107,14 @@ const FeaturedCourses = ({ courses }) => {
           title="Explore Our Courses"
           description="Discover industry-relevant certification programs designed by experts to advance your career in the most demanded technology domains."
         />
-        {/* Navigation Arrows and Scroll Container */}
-        <div className="relative mb-12">
-          {/* Left Navigation Arrow */}
-          <AnimatePresence>
-            {showLeftArrow && (
-              <motion.button
-                initial={{ opacity: 0, scale: 0.8 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.8 }}
-                whileHover={{ scale: 1.1 }}
-                whileTap={{ scale: 0.9 }}
-                onClick={() => scroll("left")}
-                className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-4 z-20 w-12 h-12 bg-background border border-border rounded-full shadow-2xl flex items-center justify-center hover:bg-primary hover:text-white transition-all duration-300 group"
-              >
-                <ChevronLeft className="h-6 w-6 group-hover:scale-110 transition-transform" />
-              </motion.button>
-            )}
-          </AnimatePresence>
-
-          {/* Scroll Container */}
-          <div className="relative">
-            <motion.div
-              ref={scrollContainerRef}
-              variants={containerVariants}
-              initial="hidden"
-              whileInView="visible"
-              viewport={{ once: true, amount: 0.1 }}
-              className="flex gap-6 overflow-x-auto pb-6 scrollbar-hide"
-              style={{
-                scrollbarWidth: "none",
-                msOverflowStyle: "none",
-              }}
-            >
-              {/* Add padding to first and last items for better scroll experience */}
-              <div className="flex-shrink-0 w-4" />
-              {courseList.map((course) => (
-                <FeaturedCourseCard
-                  key={course.id}
-                  course={course}
-                  hoveredCourse={hoveredCourse}
-                  setHoveredCourse={setHoveredCourse}
-                />
-              ))}
-              <div className="flex-shrink-0 w-4" />
-            </motion.div>
-
-            {/* Gradient fade effects on sides */}
-            <div className="absolute left-0 top-0 bottom-0 w-20 bg-gradient-to-r from-background to-transparent pointer-events-none" />
-            <div className="absolute right-0 top-0 bottom-0 w-20 bg-gradient-to-l from-background to-transparent pointer-events-none" />
-          </div>
-
-          {/* Right Navigation Arrow */}
-          <AnimatePresence>
-            {showRightArrow && (
-              <motion.button
-                initial={{ opacity: 0, scale: 0.8 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.8 }}
-                whileHover={{ scale: 1.1 }}
-                whileTap={{ scale: 0.9 }}
-                onClick={() => scroll("right")}
-                className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-4 z-20 w-12 h-12 bg-background border border-border rounded-full shadow-2xl flex items-center justify-center hover:bg-primary hover:text-white transition-all duration-300 group"
-              >
-                <ChevronRight className="h-6 w-6 group-hover:scale-110 transition-transform" />
-              </motion.button>
-            )}
-          </AnimatePresence>
+        {/* Courses list — reuse the shared CourseList component for consistency */}
+        <div className="mb-12">
+          <CourseList
+            courses={courseList}
+            loading={coursesLoading}
+            enrollmentStatus={enrollmentStatus}
+            className="mt-6"
+          />
         </div>
       </PageContainer>
 

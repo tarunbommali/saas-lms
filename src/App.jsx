@@ -29,6 +29,7 @@ import CourseDetailsPage from "./pages/CourseDetailsPage.jsx";
 import LegalPage from "./pages/LegalPage.jsx";
 import SignIn from "./pages/SignIn.jsx";
 import SignUp from "./pages/SignUp.jsx";
+import ForgotPassword from "./pages/ForgotPassword.jsx";
 
 // ----------------------------
 // Protected User Pages
@@ -41,26 +42,29 @@ import CheckoutPage from "./pages/CheckoutPage.jsx";
 // ----------------------------
 // Admin Pages (Lazy Loaded for Performance)
 // ----------------------------
-const AdminPage = lazy(() => import("./pages/admin/AdminPage.jsx"));
-const Analytics = lazy(() => import("./pages/admin/Analytics.jsx"));
-const CourseForm = lazy(() => import("./pages/admin/CourseForm.jsx"));
-const CourseManagement = lazy(() =>
-  import("./pages/admin/CourseManagement.jsx")
-);
-const UsersManagement = lazy(() => import("./pages/admin/UsersManagement.jsx"));
+const AdminPage = lazy(() => import("./pages/admin/admin-dashboard/AdminPage.jsx"));
+const Analytics = lazy(() => import("./pages/admin/admin-dashboard/Analytics.jsx"));
+const CourseManagement = lazy(() => import("./pages/admin/course-management/CourseManagement.jsx"));
+const CourseCreateForm = lazy(() => import("./pages/admin/course-management/CourseCreateForm.jsx"));
+const CourseEditForm = lazy(() => import("./pages/admin/course-management/CourseEditForm.jsx"));
+const UsersManagement = lazy(() => import("./pages/admin/user-management/UsersManagement.jsx"));
 const UserManagementForm = lazy(() =>
-  import("./pages/admin/UserManagementForm.jsx")
+  import("./pages/admin/user-management/UserManagementForm.jsx")
 );
-const AdminCoupons = lazy(() => import("./pages/admin/AdminCoupons.jsx"));
+const AdminCoupons = lazy(() => import("./pages/admin/coupon-management/AdminCoupons.jsx"));
 const CreateEditCouponPage = lazy(() =>
-  import("./pages/admin/CreateEditCouponPage.jsx")
+  import("./pages/admin/coupon-management/CreateEditCouponPage.jsx")
 );
 const EnrollmentManagement = lazy(() =>
-  import("./pages/admin/EnrollmentManagement.jsx")
+  import("./pages/admin/enrollment-management/EnrollmentManagement.jsx")
 );
 const ManualEnrollmentForm = lazy(() =>
-  import("./pages/admin/ManualEnrollmentForm.jsx")
+  import("./pages/admin/enrollment-management/ManualEnrollmentForm.jsx")
 );
+const CertificateGenerator = lazy(() =>
+  import("./pages/admin/certification-management/CertificationManagement.jsx")
+);
+
 // ----------------------------
 // Main Application
 // ----------------------------
@@ -88,6 +92,7 @@ const App = () => {
                       {/* Auth Routes (No Layout Header/Footer) */}
                       <Route path="/auth/signin" element={<SignIn />} />
                       <Route path="/auth/signup" element={<SignUp />} />
+                      <Route path="/auth/forgot-password" element={<ForgotPassword />} />
 
                       {/* User Protected Routes */}
                       <Route
@@ -144,6 +149,17 @@ const App = () => {
                           </ProtectedRoute>
                         }
                       />
+
+                      <Route
+                        path="/admin/certifications"
+                        element={
+                          <ProtectedRoute requiredRole="admin">
+                            <Suspense fallback={<LoadingScreen />}>
+                              <CertificateGenerator />
+                            </Suspense>
+                          </ProtectedRoute>
+                        }
+                      />
                       <Route
                         path="/admin/users"
                         element={
@@ -189,7 +205,7 @@ const App = () => {
                         element={
                           <ProtectedRoute requiredRole="admin">
                             <Suspense fallback={<LoadingScreen />}>
-                              <CourseForm />
+                              <CourseCreateForm />
                             </Suspense>
                           </ProtectedRoute>
                         }
@@ -199,7 +215,7 @@ const App = () => {
                         element={
                           <ProtectedRoute requiredRole="admin">
                             <Suspense fallback={<LoadingScreen />}>
-                              <CourseForm />
+                              <CourseEditForm />
                             </Suspense>
                           </ProtectedRoute>
                         }

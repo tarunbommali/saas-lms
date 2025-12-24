@@ -1,10 +1,9 @@
-/* eslint-disable no-console */
-// ../hooks/admin/useEnrollmentContext.js
-
-import { useState, useEffect } from "react";
-import { getAllUsersData } from "../../firebase/services_modular/userOperations";
-import { getUserEnrollments } from "../../firebase/services_modular/enrollmentOperations";
-import { getAllCourses } from "../../firebase/services_modular/courseOperations";
+import { useState, useEffect, useCallback } from "react";
+import {
+  getAllUsersData,
+  getAllCourses,
+  getAllEnrollments,
+} from "../../services/index.js";
 
 export const useEnrollmentContext = () => {
   const [enrollments, setEnrollments] = useState([]);
@@ -13,97 +12,63 @@ export const useEnrollmentContext = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  const fetchAllData = async () => {
+  const fetchAllData = useCallback(async () => {
     setLoading(true);
     setError(null);
-    
+
     try {
-      console.log("Fetching users and courses...");
-      
-      const [usersResult, coursesResult] = await Promise.all([
+      const [usersResult, coursesResult, enrollmentsResult] = await Promise.all([
         getAllUsersData(500),
         getAllCourses(),
+        getAllEnrollments({ limit: 2000 }),
       ]);
 
-      console.log("Users result:", usersResult);
-      console.log("Courses result:", coursesResult);
-
-      if (usersResult?.success) {
-        setUsers(usersResult.data || []);
-      } else {
+      if (!usersResult?.success) {
         throw new Error(usersResult?.error || "Failed to fetch users");
       }
-
-      if (coursesResult?.success) {
-        setCourses(coursesResult.data || []);
-      } else {
+      if (!coursesResult?.success) {
         throw new Error(coursesResult?.error || "Failed to fetch courses");
       }
+      if (!enrollmentsResult?.success) {
+        throw new Error(enrollmentsResult?.error || "Failed to fetch enrollments");
+      }
 
-      await fetchAllEnrollments(usersResult.data || []);
+      const userList = Array.isArray(usersResult.data) ? usersResult.data : [];
+      const courseList = Array.isArray(coursesResult.data) ? coursesResult.data : [];
+      const enrollmentList = Array.isArray(enrollmentsResult.data) ? enrollmentsResult.data : [];
+
+      const courseMap = new Map(courseList.map((course) => [String(course.courseId || course.id), course]));
+      const userMap = new Map(userList.map((user) => [String(user.uid || user.id), user]));
+
+      const normalizedEnrollments = enrollmentList.map((enrollment) => {
+        const courseId = String(enrollment.courseId);
+        const userId = String(enrollment.userId);
+        return {
+          ...enrollment,
+          user: userMap.get(userId) || null,
+          course: courseMap.get(courseId) || null,
+        };
+      });
+
+      setUsers(userList);
+      setCourses(courseList);
+      setEnrollments(normalizedEnrollments);
     } catch (err) {
-      console.error("Error in fetchAllData:", err);
-      setError(err.message || "Failed to load data");
+      const message = err?.message || "Failed to load data";
+      setError(message);
+      setEnrollments([]);
     } finally {
       setLoading(false);
     }
-  };
-
-  const fetchAllEnrollments = async (userList) => {
-    if (!userList || userList.length === 0) {
-      console.log("No users found to fetch enrollments");
-      setEnrollments([]);
-      return;
-    }
-
-    try {
-      console.log(`Fetching enrollments for ${userList.length} users...`);
-      
-      const enrollmentPromises = userList.map(async (user) => {
-        if (!user?.uid) {
-          console.warn("User missing UID:", user);
-          return [];
-        }
-
-        try {
-          const result = await getUserEnrollments(user.uid);
-          console.log(`Enrollments for user ${user.uid}:`, result);
-          
-          if (result?.success && Array.isArray(result.data)) {
-            return result.data.map(enrollment => ({
-              ...enrollment,
-              user: user,
-              course: courses.find(c => c.courseId === enrollment.courseId),
-            }));
-          }
-          return [];
-        } catch (userError) {
-          console.error(`Error fetching enrollments for user ${user.uid}:`, userError);
-          return [];
-        }
-      });
-
-      const enrollmentArrays = await Promise.all(enrollmentPromises);
-      const allEnrollments = enrollmentArrays.flat().filter(Boolean);
-      
-      console.log("Total enrollments found:", allEnrollments.length);
-      setEnrollments(allEnrollments);
-    } catch (err) {
-      console.error("Error in fetchAllEnrollments:", err);
-      setError("Failed to fetch enrollments");
-      setEnrollments([]);
-    }
-  };
-
-  const refreshData = () => {
-    console.log("Refreshing enrollment data...");
-    fetchAllData();
-  };
+  }, []);
 
   useEffect(() => {
-    console.log("useEnrollmentContext mounted, fetching data...");
     fetchAllData();
-  }, []);
+  }, [fetchAllData]);
+
+  const refreshData = useCallback(() => {
+    fetchAllData();
+  }, [fetchAllData]);
 
   return {
     // State

@@ -1,7 +1,6 @@
 /* eslint-disable no-unused-vars */
 import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "../contexts/AuthContext.jsx";
-import { updateUserProfile } from "../firebase/services";
 import { useNavigate } from "react-router-dom";
 import PageContainer from "../components/layout/PageContainer.jsx";
 import PageTitle from "../components/ui/PageTitle.jsx";
@@ -14,7 +13,7 @@ const items = [
 ];
 
 const ProfileEdit = () => {
-  const { currentUser, userProfile, loading } = useAuth();
+  const { currentUser, userProfile, loading, updateProfile } = useAuth();
   const navigate = useNavigate();
   const [form, setForm] = useState({});
   const [saving, setSaving] = useState(false);
@@ -88,9 +87,9 @@ const ProfileEdit = () => {
         socialLinks: form.socialLinks,
       };
 
-      const res = await updateUserProfile(currentUser.uid, payload);
-      if (!res.success)
-        throw new Error(res.error || "Failed to update profile");
+      const res = await updateProfile(payload);
+      if (!res)
+        throw new Error("Failed to update profile");
 
       setStatusMessage({
         type: "success",

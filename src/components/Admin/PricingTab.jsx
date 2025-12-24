@@ -3,11 +3,12 @@ import React from "react";
 import FormField from "../ui/FormField";
 
 const PricingTab = ({ course, handleCourseChange, errors }) => {
+  const currentPrice = Number(course.price ?? 0) || 0;
+  const originalPrice = Number(course.originalPrice ?? 0) || 0;
+
   const discountPercent =
-    course.originalPrice > course.price
-      ? Math.round(
-          ((course.originalPrice - course.price) / course.originalPrice) * 100
-        )
+    originalPrice > currentPrice
+      ? Math.round(((originalPrice - currentPrice) / originalPrice) * 100)
       : 0;
 
   return (
@@ -21,9 +22,12 @@ const PricingTab = ({ course, handleCourseChange, errors }) => {
         <FormField
           label="Current Price (₹) *"
           type="number"
-          value={course.price}
+          value={course.price ?? ""}
           onChange={(value) =>
-            handleCourseChange("price", parseInt(value) || 0)
+            handleCourseChange(
+              "price",
+              value === "" ? "" : Number(value)
+            )
           }
           error={errors.price}
           required
@@ -34,15 +38,18 @@ const PricingTab = ({ course, handleCourseChange, errors }) => {
         <FormField
           label="Original Price (₹)"
           type="number"
-          value={course.originalPrice}
+          value={course.originalPrice ?? ""}
           onChange={(value) =>
-            handleCourseChange("originalPrice", parseInt(value) || 0)
+            handleCourseChange(
+              "originalPrice",
+              value === "" ? "" : Number(value)
+            )
           }
           min="0"
         />
 
         {/* Discount Calculation */}
-        {course.originalPrice > course.price && (
+        {originalPrice > currentPrice && (
           <div className="lg:col-span-2">
             <div className="flex items-center space-x-6 p-4 bg-blue-50 rounded-lg">
               <div className="text-sm">
@@ -54,7 +61,7 @@ const PricingTab = ({ course, handleCourseChange, errors }) => {
               <div className="text-sm">
                 <span className="font-medium">You Save: </span>
                 <span className="text-green-600 font-bold">
-                  ₹{course.originalPrice - course.price}
+                  ₹{originalPrice - currentPrice}
                 </span>
               </div>
             </div>

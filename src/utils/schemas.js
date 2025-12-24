@@ -1,10 +1,6 @@
-// Compatibility wrapper: re-export the canonical firebase services implementation.
-// This file preserves older import paths that referenced `src/utils/schemas.js`.
-// Compatibility wrapper: re-export the canonical firebase services implementation.
-// This file preserves older import paths that referenced `src/utils/schemas.js`.
-// The single source of truth for Firebase operations is `src/firebase/services.js`.
+// src/utils/schemas.js
+// This file is kept for backwards compatibility.
+// All schema and validation helpers are now in schema.js and services/index.js
 
-import * as services from '../firebase/services';
-
-export * from '../firebase/services';
-export default services;
+export * from './schema.js';
+export { default } from './schema.js';

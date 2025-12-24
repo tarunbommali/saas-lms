@@ -98,7 +98,7 @@ const PreviewTab = ({
               <p className="text-sm text-muted-foreground mb-3">{course?.description || 'Course description will appear here.'}</p>
               <div className="flex items-baseline gap-2">
                 <span className="text-xl font-bold">₹{course?.price || 0}</span>
-                {course?.originalPrice > course?.price && (
+                {Number(course?.originalPrice ?? 0) > Number(course?.price ?? 0) && (
                   <span className="text-sm text-muted-foreground line-through">₹{course?.originalPrice}</span>
                 )}
               </div>

@@ -9,14 +9,11 @@ import {
     updateUserProgress,
     checkUserEnrollment,
     getSecureVideoAccessUrl 
-} from '../firebase/services';
+} from '../services/index.js';
 import { useAuth } from './AuthContext';
 
 // 🚨 FIX 1: Rename the context constant here to match the Provider/Hook names
 const LearnPageContext = createContext(undefined); 
-
-// Using a mock increment since we can't import from firebase/firestore here
-const increment = (value) => value; 
 
 // 🚨 FALLBACK IMPORTS (Add these based on your file structure)
 import { EMERGING_TECH_COURSE_CONTENT, FALLBACK_ENROLLMENT_STATUS, FALLBACK_COURSE_ID } from '../utils/fallbackData'; 

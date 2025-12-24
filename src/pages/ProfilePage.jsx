@@ -1,6 +1,6 @@
 /* eslint-disable no-console */
 /* eslint-disable no-unused-vars */
-import { useCallback } from "react";
+import { useCallback, useMemo, useState, useRef, useEffect } from "react";
 import { useNavigate, Navigate } from "react-router-dom";
 import {
   School,
@@ -14,18 +14,24 @@ import {
   Linkedin,
   Github,
   Calendar,
+  Download,
+  CheckCircle,
+  Clock,
+  Share2,
 } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext.jsx";
-import { useUser } from "../contexts/UserContext.jsx"; // Context providing enrollments
+import { useUser } from "../contexts/UserContext.jsx";
 import { global_classnames } from "../utils/classnames.js";
 import PageContainer from "../components/layout/PageContainer.jsx";
+import CertificateTemplate from "../components/Certificate/CertificateTemplate.jsx";
+import { getCleanEnrollmentData } from "../utils/helper/enrollmentHelpers.jsx";
+import html2canvas from "html2canvas";
+import { jsPDF } from "jspdf";
+import { apiRequest } from "../api/client.js";
+
 const PRIMARY_BLUE = "var(--color-primary)";
 
-// ----------------------------------------------------------------------
-// Shimmer Loading Component (Kept the same)
-// ----------------------------------------------------------------------
-
-// Helper Shimmer component for a skeleton effect
+// Shimmer Loading Component
 const Shimmer = () => (
   <div className="animate-pulse space-y-8 py-16">
     <div
@@ -64,26 +70,16 @@ const Shimmer = () => (
             <div className="h-16 bg-gray-100 border rounded-lg"></div>
             <div className="h-16 bg-gray-100 border rounded-lg"></div>
           </div>
-          {/* Recommended Courses Shimmer */}
-          <div className="bg-white p-6 rounded-xl shadow-md space-y-4">
-            <div className="h-6 bg-gray-200 rounded w-2/5"></div>
-            <div className="h-16 bg-yellow-50 border rounded-lg"></div>
-            <div className="h-16 bg-yellow-50 border rounded-lg"></div>
-          </div>
         </div>
       </div>
     </div>
   </div>
 );
 
-// ----------------------------------------------------------------------
-// Main Profile Component
-// ----------------------------------------------------------------------
-
 // Helper function to get initials for placeholder avatar
 const getInitials = (name) => {
   if (!name) return "U";
-  const parts = name.split(" ");
+  const parts = name.split(" ").filter(part => part.trim() !== "");
   if (parts.length > 1) {
     return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
   }
@@ -91,7 +87,6 @@ const getInitials = (name) => {
 };
 
 const ProfilePage = () => {
-  // Destructure `logout` function from useAuth
   const {
     currentUser,
     userProfile,
@@ -100,12 +95,33 @@ const ProfilePage = () => {
     loading: authLoading,
   } = useAuth();
   const navigate = useNavigate();
-  // Access enrollment data from useUser context
   const { enrollments, loadingEnrollments, enrollmentsError } = useUser();
 
-  // Using loadingEnrollments as the primary data loading state
+  // State for inline certificate PDF generation
+  const certificateRenderRef = useRef(null);
+  const [certificatePreviewData, setCertificatePreviewData] = useState(null);
+  const [generatingCertificateId, setGeneratingCertificateId] = useState(null);
 
-  // ✅ Define editProfile function
+  // New state for API certifications
+  const [apiCertifications, setApiCertifications] = useState([]);
+  const [loadingCerts, setLoadingCerts] = useState(false);
+
+  useEffect(() => {
+    const fetchCertifications = async () => {
+      if (!currentUser) return;
+      try {
+        setLoadingCerts(true);
+        const data = await apiRequest('/certifications');
+        setApiCertifications(data || []);
+      } catch (error) {
+        console.error("Failed to fetch certifications", error);
+      } finally {
+        setLoadingCerts(false);
+      }
+    };
+    fetchCertifications();
+  }, [currentUser]);
+
   const editProfile = useCallback(() => {
     navigate("/profile/edit");
   }, [navigate]);
@@ -115,7 +131,6 @@ const ProfilePage = () => {
     { label: "Profile", link: "/profile" },
   ];
 
-  // 🚨 FIX: Define handleLogout function 🚨
   const handleLogout = useCallback(async () => {
     try {
       await logout();
@@ -126,34 +141,320 @@ const ProfilePage = () => {
     }
   }, [logout, navigate]);
 
-  // (Previously recommended courses were set here; removed as they were unused)
+  const normalizedEnrollments = useMemo(
+    () => enrollments.map((enrollment) => getCleanEnrollmentData(enrollment)),
+    [enrollments]
+  );
 
-  // Placeholder for profile details
+  const certificationData = useMemo(() => {
+    const fallbackId = currentUser?.uid?.substring(0, 8) || "STUDENT";
+
+    return normalizedEnrollments.map((enrollment) => {
+      const courseTitle = enrollment.course?.title || enrollment.courseTitle || "Course";
+      const enrolledDate = enrollment.enrolledAt || new Date().toISOString();
+      const progress = enrollment.progress || {
+        totalVideos: 0,
+        completedVideos: 0,
+        completionPercentage: 0,
+      };
+
+      // Find matching API certification
+      const apiCert = apiCertifications.find(c => c.courseId === enrollment.courseId || c.enrollmentId === enrollment.id);
+
+      const taskProgress = enrollment.taskProgress || {
+        totalTasks: 0,
+        completedTasks: 0,
+        completionPercentage: 0,
+        validated: false,
+      };
+
+      const totalLessons = progress.totalVideos || 0;
+      const completedLessons = progress.completedVideos || 0;
+      const hasTasks = taskProgress.totalTasks > 0;
+
+      // Calculate video completion accurately
+      // Use explicit completionPercentage from backend if available and reliable
+      const videoPercent = Number.isFinite(progress.completionPercentage)
+        ? progress.completionPercentage
+        : (totalLessons > 0 ? (completedLessons / totalLessons) * 100 : 0);
+
+      const meetsVideoRequirement = videoPercent >= 100 || (totalLessons > 0 && completedLessons >= totalLessons);
+
+      const meetsTaskRequirement = hasTasks
+        ? Boolean(taskProgress.validated) && (taskProgress.completionPercentage ?? 0) >= 90
+        : true;
+
+      // Determine status from API Cert or fallback to enrollment logic
+      // If we have a backend cert record, use its status
+      const isIssued = apiCert?.status === 'ISSUED';
+      const isPending = apiCert?.status === 'PENDING';
+
+      // If enrollment says downloadable (set by backend on 100%), trust it.
+      // Also, if video progress is 100% locally, we should allow download for self-paced courses.
+      // The user has completed the course content and deserves immediate access to their certificate.
+      const certificateUnlocked = isIssued || Boolean(enrollment.certificateDownloadable) || meetsVideoRequirement;
+
+      const requirementBreakdown = [
+        {
+          key: "video",
+          label: "Complete all course videos",
+          detail: totalLessons > 0
+            ? `${completedLessons} of ${totalLessons} videos`
+            : "No video content",
+          satisfied: meetsVideoRequirement,
+        },
+        {
+          key: "tasks",
+          label: "Admin validated project tasks",
+          detail: hasTasks
+            ? `${taskProgress.completedTasks} of ${taskProgress.totalTasks} tasks`
+            : "No tasks assigned",
+          satisfied: meetsTaskRequirement || isIssued,
+          pending: isPending || (hasTasks
+            ? !taskProgress.validated && taskProgress.completedTasks >= taskProgress.totalTasks
+            : false),
+        },
+      ];
+
+      return {
+        enrollmentId: enrollment.id,
+        courseId: enrollment.courseId,
+        courseTitle,
+        enrolledDate,
+        completionDate: apiCert?.issuedAt || enrollment.certificateUnlockedAt || null,
+        completedDate: apiCert?.issuedAt || enrollment.certificateUnlockedAt || null,
+        progressPercent: Math.min(100, Math.max(0, Math.round(videoPercent))),
+        totalLessons,
+        completedLessons,
+        certificateUnlocked,
+        certificateDownloadable: certificateUnlocked,
+        certificateIssued: isIssued,
+        certificatePending: isPending,
+        certificateId: apiCert?.id || (enrollment.certificateUrl
+          ? `CERT-${enrollment.courseId}`
+          : `CERT-${enrollment.courseId}-${fallbackId}`),
+        certificateUrl: apiCert?.certificateUrl || enrollment.certificateUrl || null,
+        requirements: requirementBreakdown,
+        meetsVideoRequirement,
+        meetsTaskRequirement,
+        taskProgress,
+        progress,
+        apiCert // attach raw
+      };
+    });
+  }, [currentUser?.uid, normalizedEnrollments, apiCertifications]);
+
+  // Profile data
   const profileData = {
     fullName: userProfile?.name || currentUser?.displayName || "N/A",
     email: currentUser?.email || "N/A",
     phone: userProfile?.phone || "N/A",
-  college: userProfile?.college || "",
+    college: userProfile?.college || "",
     gender: userProfile?.gender || "Not Specified",
     skills: userProfile?.skills && Array.isArray(userProfile.skills) ? userProfile.skills : [],
-    photoUrl: currentUser?.photoURL,
     bio: userProfile?.bio || "",
     socialLinks: userProfile?.socialLinks || {},
     dateOfBirth: userProfile?.dateOfBirth || null,
+    studentId: currentUser?.uid?.substring(0, 8) || "N/A",
     initials: getInitials(userProfile?.name || currentUser?.displayName),
   };
 
-  // Show loading or redirect if not authenticated
+  const buildCertificateTemplateData = useCallback((certification) => {
+    if (!certification) {
+      return null;
+    }
+
+    const issueDate = new Date().toLocaleDateString("en-US", {
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+    });
+
+    const completionSource =
+      certification.apiCert?.issuedAt ||
+      certification.completedDate ||
+      certification.completionDate ||
+      certification.certificateUnlockedAt ||
+      new Date().toISOString();
+
+    const completionDate = new Date(completionSource).toLocaleDateString(
+      "en-US",
+      {
+        year: "numeric",
+        month: "long",
+        day: "numeric",
+      }
+    );
+
+    return {
+      studentName: profileData.fullName,
+      courseTitle: certification.courseTitle,
+      certificateId: certification.certificateId,
+      issueDate,
+      completionDate,
+      institution: "JNTU-GV NxtGen Certification",
+      instructor: "JNTU-GV Faculty",
+      duration: "Self-paced",
+      grade: "Excellent",
+      mode: "Online",
+    };
+  }, [profileData.fullName]);
+
+  const handleDownloadCertificate = useCallback((certification) => {
+    if (!certification?.certificateUnlocked || generatingCertificateId) {
+      return;
+    }
+
+    const templateData = buildCertificateTemplateData(certification);
+    if (!templateData) {
+      return;
+    }
+
+    setCertificatePreviewData({ certification, templateData });
+    setGeneratingCertificateId(certification.certificateId);
+  }, [buildCertificateTemplateData, generatingCertificateId]);
+
+  const handleShareCertificate = useCallback((platform, certification) => {
+    if (!certification?.certificateUnlocked || typeof window === "undefined") {
+      return;
+    }
+
+    const baseUrl = window.location.origin;
+    const verifyUrl = `${baseUrl}/verify/${certification.certificateId}`;
+    const shareUrl = certification.certificateUrl || verifyUrl;
+
+    const studentName = profileData.fullName || "a student";
+    const courseTitle = certification.courseTitle || "a course";
+    const certId = certification.certificateId || "";
+    const shortCertId = certId.length > 8 ? certId.substring(0, 8) : certId;
+
+    let targetUrl = "";
+
+    if (platform === "x") {
+      // Preset message for X (Twitter) - optimized for character limits
+      const xMessage = `🎓 Excited to share that I've completed "${courseTitle}" via @JNTUGV NxtGen Certification!
+
+📜 Certificate ID: ${shortCertId}
+
+#JNTUGV #Certification #Learning #Achievement`;
+      targetUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(xMessage)}&url=${encodeURIComponent(shareUrl)}`;
+    } else if (platform === "linkedin") {
+      // LinkedIn sharing - using their newer share API
+      // LinkedIn's sharing popup works best with just URL, they auto-generate preview
+      const linkedInText = `I'm excited to share that I, ${studentName}, have successfully completed the course "${courseTitle}" via JNTU-GV NxtGen Certification Program!
+
+This certification demonstrates my commitment to continuous learning and professional development.
+
+🎓 Certificate ID: ${shortCertId}
+
+Verify my achievement: ${shareUrl}
+
+#ProfessionalDevelopment #JNTUGV #Certification #LifelongLearning #Education`;
+
+      // LinkedIn uses different parameters - we'll use shareArticle for the best experience
+      targetUrl = `https://www.linkedin.com/shareArticle?mini=true&url=${encodeURIComponent(shareUrl)}&title=${encodeURIComponent(`🎓 Completed: ${courseTitle}`)}&summary=${encodeURIComponent(linkedInText)}&source=${encodeURIComponent('JNTU-GV NxtGen Certification')}`;
+    } else if (platform === "copy") {
+      // Copy link to clipboard
+      navigator.clipboard.writeText(shareUrl).then(() => {
+        alert("Certificate link copied to clipboard!");
+      }).catch(() => {
+        alert("Failed to copy link. Please try again.");
+      });
+      return;
+    }
+
+    if (targetUrl) {
+      window.open(targetUrl, "_blank", "noopener,noreferrer,width=600,height=600");
+    }
+  }, [profileData.fullName]);
+
+  useEffect(() => {
+    if (!certificatePreviewData || !certificateRenderRef.current) {
+      return;
+    }
+
+    let cancelled = false;
+
+    const renderPdf = async () => {
+      try {
+        // Wait for React to render the component
+        await new Promise((resolve) => requestAnimationFrame(() => resolve()));
+        // Give additional time for styles and layout to settle
+        await new Promise((resolve) => setTimeout(resolve, 300));
+
+        if (!certificateRenderRef.current || cancelled) {
+          return;
+        }
+
+        const canvas = await html2canvas(certificateRenderRef.current, {
+          scale: 2,
+          useCORS: true,
+          logging: false,
+          backgroundColor: "#ffffff",
+          allowTaint: false,
+          removeContainer: false,
+        });
+
+        if (cancelled) {
+          return;
+        }
+
+        const imageData = canvas.toDataURL("image/png");
+        const pdf = new jsPDF("landscape", "mm", "a4");
+        const pageWidth = pdf.internal.pageSize.getWidth();
+        const pageHeight = pdf.internal.pageSize.getHeight();
+
+        pdf.addImage(imageData, "PNG", 0, 0, pageWidth, pageHeight);
+
+        const fileIdentifier =
+          certificatePreviewData.certification?.certificateId ||
+          certificatePreviewData.certification?.courseId ||
+          "certificate";
+
+        pdf.save(`${fileIdentifier}.pdf`);
+      } catch (error) {
+        console.error("Failed to generate certificate PDF", error);
+        alert("Unable to generate the certificate PDF. Please try again.");
+      } finally {
+        if (!cancelled) {
+          setCertificatePreviewData(null);
+          setGeneratingCertificateId(null);
+        }
+      }
+    };
+
+    renderPdf();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [certificatePreviewData]);
+
+  // Format date
+  const formatDate = (dateString) => {
+    try {
+      if (!dateString) return 'N/A';
+      return new Date(dateString).toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric'
+      });
+    } catch (e) { return 'N/A'; }
+  };
+
+  // Calculate progress percentage
+  const getProgressPercentage = (certification) => {
+    return Math.min(100, Math.max(0, certification.progressPercent || 0));
+  };
+
   if (!isAuthenticated && !authLoading) {
     return <Navigate to="/auth/signin" replace />;
   }
 
-  // Use Shimmer when authentication state or enrollment data is loading
   if (authLoading || loadingEnrollments) {
     return <Shimmer />;
   }
 
-  // Combine any data errors
   const combinedError = enrollmentsError;
 
   return (
@@ -175,18 +476,10 @@ const ProfilePage = () => {
         style={{ borderColor: PRIMARY_BLUE }}
       >
         <div className="flex flex-col md:flex-row items-center gap-6">
-          {/* Profile Picture */}
-          {profileData.photoUrl ? (
-            <img
-              src={profileData.photoUrl}
-              alt={profileData.fullName}
-              className="w-24 h-24 rounded-full object-cover border-4 border-gray-200 shadow-md"
-            />
-          ) : (
-            <div className="w-24 h-24 rounded-full bg-blue-600 text-white text-4xl flex items-center justify-center font-bold">
-              {profileData.initials}
-            </div>
-          )}
+          {/* Profile Picture - Only Initials */}
+          <div className="w-24 h-24 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold text-3xl">
+            {profileData.initials}
+          </div>
 
           {/* Title and Summary */}
           <div className="text-center md:text-left flex-1">
@@ -292,7 +585,7 @@ const ProfilePage = () => {
           </div>
         </div>
 
-        {/* RIGHT COLUMN: Enrolled & Recommended Courses */}
+        {/* RIGHT COLUMN: Enrolled Courses & Certifications */}
         <div className="lg:col-span-2 space-y-8">
           {/* Enrolled Courses */}
           <div className="p-6 rounded-xl shadow-md card">
@@ -347,7 +640,202 @@ const ProfilePage = () => {
               </div>
             )}
           </div>
+
+          {/* Certifications Section */}
+          <div className="p-6 rounded-xl shadow-md card">
+            <h2 className="text-2xl font-bold text-gray-800 border-b pb-3 mb-4 flex items-center gap-3">
+              <CheckCircle className="w-6 h-6" style={{ color: PRIMARY_BLUE }} />
+              <span>My Certifications</span>
+              <span className="ml-2 inline-flex items-center justify-center px-3 py-1 rounded-full bg-gray-100 text-sm font-medium text-gray-700">
+                {certificationData.filter(cert => cert.certificateUnlocked || cert.certificatePending).length}
+              </span>
+            </h2>
+
+            {certificationData.length > 0 ? (
+              <div className="space-y-4">
+                {certificationData.map((certification, index) => {
+                  const isGeneratingThisCertificate =
+                    generatingCertificateId === certification.certificateId;
+
+                  return (
+                    <div
+                      key={index}
+                      className="p-4 rounded-lg border"
+                      style={{
+                        background: "var(--color-card)",
+                        borderColor: "var(--color-border)",
+                      }}
+                    >
+                      <div className="flex justify-between items-start mb-3">
+                        <div className="flex-1">
+                          <h3 className="font-semibold text-lg text-gray-800">
+                            {certification.courseTitle}
+                          </h3>
+                          <p className="text-sm text-gray-600 mt-1">
+                            Enrolled on {formatDate(certification.enrolledDate)}
+                          </p>
+
+                          {/* Progress Bar */}
+                          <div className="mt-3">
+                            <div className="flex justify-between text-sm text-gray-600 mb-1">
+                              <span>Progress</span>
+                              <span>{getProgressPercentage(certification)}%</span>
+                            </div>
+                            <div className="w-full bg-gray-200 rounded-full h-2">
+                              <div
+                                className="bg-green-600 h-2 rounded-full transition-all duration-300"
+                                style={{ width: `${getProgressPercentage(certification)}%` }}
+                              ></div>
+                            </div>
+                            <p className="text-xs text-gray-500 mt-1">
+                              {certification.completedLessons} of {certification.totalLessons} lessons completed
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="ml-4 flex flex-col items-center gap-2 w-full max-w-[180px]">
+                          {certification.certificateUnlocked ? (
+                            <>
+                              <div className="flex items-center gap-1 text-green-600">
+                                <CheckCircle className="w-5 h-5" />
+                                <span className="text-sm font-medium">Completed</span>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => handleDownloadCertificate(certification)}
+                                disabled={isGeneratingThisCertificate}
+                                className={`flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-white text-sm transition-colors ${isGeneratingThisCertificate
+                                  ? "bg-blue-400 cursor-not-allowed"
+                                  : "bg-blue-600 hover:bg-blue-700"
+                                  }`}
+                              >
+                                <Download className="w-4 h-4" />
+                                {isGeneratingThisCertificate ? "Preparing..." : "Download PDF"}
+                              </button>
+                              <div className="flex flex-col gap-2 w-full">
+                                <button
+                                  type="button"
+                                  onClick={() => handleShareCertificate("x", certification)}
+                                  className="flex items-center justify-center gap-2 px-3 py-2 bg-black text-white rounded-lg text-sm hover:bg-gray-800 transition-colors"
+                                >
+                                  <Share2 className="w-4 h-4" />
+                                  Share on X
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleShareCertificate("linkedin", certification)}
+                                  className="flex items-center justify-center gap-2 px-3 py-2 bg-blue-700 text-white rounded-lg text-sm hover:bg-blue-800 transition-colors"
+                                >
+                                  <Linkedin className="w-4 h-4" />
+                                  Share on LinkedIn
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleShareCertificate("copy", certification)}
+                                  className="flex items-center justify-center gap-2 px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-700 hover:bg-gray-100 transition-colors"
+                                >
+                                  📋 Copy Link
+                                </button>
+                              </div>
+                              <p className="text-xs text-gray-500 text-center">
+                                ID: {certification.certificateId && certification.certificateId.length > 8 ? certification.certificateId.substring(0, 8) + '...' : certification.certificateId}
+                              </p>
+                            </>
+                          ) : (
+                            <>
+                              <div className="flex items-center gap-1 text-yellow-600">
+                                <Clock className="w-5 h-5" />
+                                <span className="text-sm font-medium">{certification.certificatePending ? 'Pending Review' : 'In Progress'}</span>
+                              </div>
+                              <button
+                                type="button"
+                                disabled
+                                className="flex items-center gap-2 px-4 py-2 bg-gray-400 text-white rounded-lg cursor-not-allowed text-sm"
+                              >
+                                {certification.certificatePending ? <Clock className="w-4 h-4" /> : <Download className="w-4 h-4" />}
+                                {certification.certificatePending ? 'Awaiting Review' : 'Complete Course'}
+                              </button>
+                              <div className="text-xs text-gray-500 text-left space-y-1">
+                                {certification.requirements.map((req) => (
+                                  <p key={req.key}>
+                                    {req.satisfied ? '[x]' : '[ ]'} {req.label}
+                                    {!req.satisfied && req.pending ? ' (awaiting review)' : ''}
+                                  </p>
+                                ))}
+                              </div>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                      {!certification.certificateUnlocked && (
+                        <div className="mt-3 pt-3 border-t text-xs text-gray-600">
+                          <p className="font-medium mb-1">Requirements:</p>
+                          <ul className="space-y-1">
+                            {certification.requirements.map((req) => (
+                              <li key={req.key} className="flex items-start gap-2">
+                                {req.satisfied ? (
+                                  <CheckCircle className="w-4 h-4 text-green-500 mt-[2px]" />
+                                ) : (
+                                  <Clock className="w-4 h-4 text-yellow-500 mt-[2px]" />
+                                )}
+                                <span>
+                                  <span className="font-medium">{req.label}</span>
+                                  <span className="block text-gray-500">{req.detail}</span>
+                                  {!req.satisfied && req.pending && (
+                                    <span className="block text-orange-600">Awaiting admin validation</span>
+                                  )}
+                                </span>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div
+                className="text-center py-6 border-2 border-dashed rounded-lg"
+                style={{ borderColor: "var(--color-border)" }}
+              >
+                <CheckCircle className="w-12 h-12 text-gray-400 mx-auto mb-3" />
+                <p className="text-muted mb-2">
+                  No certifications yet
+                </p>
+                <p className="text-sm text-gray-500 mb-4">
+                  Complete your enrolled courses to earn certifications
+                </p>
+                <button
+                  onClick={() => navigate("/courses")}
+                  className="px-4 py-2 text-white rounded-full text-sm hover:opacity-90 transition"
+                  style={{ background: "var(--color-primary)" }}
+                >
+                  Browse Courses
+                </button>
+              </div>
+            )}
+          </div>
         </div>
+      </div>
+
+      {/* Hidden certificate rendering surface for PDF generation */}
+      <div
+        aria-hidden="true"
+        style={{ position: "fixed", top: "-9999px", left: "-9999px", zIndex: -1 }}
+      >
+        {certificatePreviewData ? (
+          <div
+            ref={certificateRenderRef}
+            style={{
+              width: "800px",
+              height: "600px",
+              backgroundColor: "#ffffff",
+            }}
+          >
+            <CertificateTemplate {...certificatePreviewData.templateData} />
+          </div>
+        ) : null}
       </div>
     </PageContainer>
   );

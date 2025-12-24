@@ -6,7 +6,7 @@ import {
   useRealtimeCourse,
   useRealtimeEnrollmentStatus,
   useRealtimeEnrollmentMutations,
-} from "../hooks/useRealtimeFirebase";
+} from "../hooks/useRealtimeApi.js";
 import useRazorpay from "../hooks/useRazorpay";
 import PageContainer from "../components/layout/PageContainer";
 import {

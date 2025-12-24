@@ -56,8 +56,10 @@ export const filterEnrollments = (enrollments, filters) => {
       courseTitle.toLowerCase().includes(searchTerm.toLowerCase());
 
     const matchesStatus = statusFilter === "ALL" || enrollment.status === statusFilter;
-    const matchesUser = userFilter === "ALL" || enrollment.userId === userFilter;
-    const matchesCourse = courseFilter === "ALL" || enrollment.courseId === courseFilter;
+    const matchesUser =
+      userFilter === "ALL" || String(enrollment.userId) === String(userFilter);
+    const matchesCourse =
+      courseFilter === "ALL" || String(enrollment.courseId) === String(courseFilter);
 
     return matchesSearch && matchesStatus && matchesUser && matchesCourse;
   });
@@ -72,16 +74,119 @@ export const calculateStats = (enrollments) => {
   return { total, successful, pending, totalRevenue };
 };
 
+const clampPercentage = (value, min = 0, max = 100) => {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return min;
+  return Math.min(max, Math.max(min, numeric));
+};
+
+const parseObject = (value, fallback = {}) => {
+  if (!value) return { ...fallback };
+  if (typeof value === 'string') {
+    try {
+      const parsed = JSON.parse(value);
+      return parsed && typeof parsed === 'object' ? parsed : { ...fallback };
+    } catch {
+      return { ...fallback };
+    }
+  }
+  if (typeof value === 'object') return { ...value };
+  return { ...fallback };
+};
+
+const normalizeTaskProgress = (rawProgress = {}) => {
+  const toInt = (value) => {
+    const num = Number.parseInt(value, 10);
+    return Number.isFinite(num) ? Math.max(0, num) : 0;
+  };
+
+  const source = parseObject(rawProgress);
+
+  const totalTasks = toInt(source.totalTasks ?? source.total ?? 0);
+  const completedTasksRaw = toInt(source.completedTasks ?? source.completed ?? 0);
+  const completedTasks = Math.min(totalTasks, completedTasksRaw);
+  const completionDerived = totalTasks > 0 ? (completedTasks / totalTasks) * 100 : 0;
+  const completionSource = Number(source.completionPercentage ?? completionDerived);
+  const completionPercentage = clampPercentage(
+    Number.isFinite(completionSource) ? completionSource : completionDerived
+  );
+
+  return {
+    totalTasks,
+    completedTasks,
+    completionPercentage: Number(Number(completionPercentage).toFixed(2)),
+    validated: Boolean(source.validated ?? source.manualValidation ?? false),
+    manualNotes: typeof source.manualNotes === 'string'
+      ? source.manualNotes.trim()
+      : null,
+    validatedAt: source.validatedAt || null,
+    validatedBy: source.validatedBy || null,
+  };
+};
+
+const normalizeVideoProgress = (rawProgress = {}) => {
+  const source = parseObject(rawProgress);
+
+  const toInt = (value) => {
+    const num = Number.parseInt(value, 10);
+    return Number.isFinite(num) ? Math.max(0, num) : 0;
+  };
+
+  const totalVideos = toInt(
+    source.totalVideos ?? source.totalLessons ?? source.total ?? source.videoCount ?? 0
+  );
+  const completedVideos = Math.min(
+    totalVideos,
+    toInt(source.completedVideos ?? source.completedLessons ?? source.completed ?? 0)
+  );
+  const totalModules = toInt(source.totalModules ?? source.modulesTotal ?? 0);
+  const modulesCompleted = Math.min(
+    totalModules,
+    toInt(source.modulesCompleted ?? source.completedModules ?? 0)
+  );
+
+  const completionFromVideos = totalVideos > 0
+    ? (completedVideos / totalVideos) * 100
+    : (totalModules > 0 ? (modulesCompleted / totalModules) * 100 : 0);
+
+  const completionSource = Number(
+    source.completionPercentage ?? source.percent ?? completionFromVideos
+  );
+
+  const completionPercentage = clampPercentage(
+    Number.isFinite(completionSource) ? completionSource : completionFromVideos
+  );
+
+  return {
+    totalVideos,
+    completedVideos,
+    totalModules,
+    modulesCompleted,
+    completionPercentage: Number(Number(completionPercentage).toFixed(2)),
+    lastPlayed: source.lastPlayed ?? null,
+    raw: source,
+  };
+};
+
 // New function to clean enrollment data for display
 export const getCleanEnrollmentData = (enrollment) => {
+  const taskProgress = normalizeTaskProgress(enrollment.taskProgress || enrollment.progress?.tasks || {});
+  const progress = normalizeVideoProgress(enrollment.progress || {});
+
   return {
     id: enrollment.id,
     userId: enrollment.userId,
     courseId: enrollment.courseId,
+    courseTitle: enrollment.courseTitle || enrollment.course?.title || null,
     status: enrollment.status || "PENDING",
     paidAmount: enrollment.paidAmount || 0,
     enrolledAt: enrollment.enrolledAt,
     paymentDetails: enrollment.paymentDetails || {},
+    taskProgress,
+    progress,
+    certificateDownloadable: Boolean(enrollment.certificateDownloadable),
+    certificateUnlockedAt: enrollment.certificateUnlockedAt || null,
+    certificateIssued: Boolean(enrollment.certificateIssued),
 
     // User data (if available)
     user: enrollment.user

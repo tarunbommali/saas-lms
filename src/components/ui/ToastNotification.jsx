@@ -1,57 +1,38 @@
 /* eslint-disable no-unused-vars */
-// src/components/ui/ToastNotification.jsx
 import React, { useEffect } from 'react';
-import { 
-  CheckCircle, 
-  XCircle, 
-  AlertTriangle, 
-  Info, 
-  X 
+import {
+  CheckCircle,
+  XCircle,
+  AlertTriangle,
+  Info,
+  X
 } from 'lucide-react';
 import { useTheme } from '../../contexts/ThemeContext';
 
-/**
- * ToastNotification Component
- * 
- * @param {Object} props
- * @param {boolean} props.show - Whether to show the toast
- * @param {string} props.message - The message to display
- * @param {string} props.type - Type of toast: 'success', 'error', 'warning', 'info'
- * @param {number} props.duration - Auto-hide duration in ms (0 = no auto-hide)
- * @param {Function} props.onClose - Callback when toast is closed
- * @param {string} props.position - Toast position: 'top-right', 'top-left', 'bottom-right', 'bottom-left'
- * @param {boolean} props.showCloseButton - Whether to show close button
- * @param {string} props.title - Optional title for the toast
- * @param {React.ReactNode} props.action - Optional action button/content
- */
 const ToastNotification = ({
   show = false,
   message = '',
   type = 'info',
   duration = 5000,
   onClose,
-  position = 'top-right',
+  position = 'bottom-center', // ✅ default now bottom-center
   showCloseButton = true,
   title,
   action
 }) => {
   const { colors, isDark } = useTheme();
 
-  // Auto-hide functionality
   useEffect(() => {
     if (show && duration > 0) {
       const timer = setTimeout(() => {
         onClose?.();
       }, duration);
-
       return () => clearTimeout(timer);
     }
   }, [show, duration, onClose]);
 
-  // Don't render if not showing
   if (!show) return null;
 
-  // Icon configuration based on type
   const getIconConfig = () => {
     const baseConfig = {
       success: {
@@ -79,29 +60,42 @@ const ToastNotification = ({
         borderColor: isDark ? 'rgba(77, 159, 255, 0.3)' : 'rgba(10, 102, 194, 0.3)'
       }
     };
-
     return baseConfig[type] || baseConfig.info;
   };
 
-  // Position classes
+  // ✅ updated to include bottom-center default
   const getPositionClasses = () => {
     const positionMap = {
       'top-right': 'top-4 right-4',
       'top-left': 'top-4 left-4',
       'bottom-right': 'bottom-4 right-4',
-      'bottom-left': 'bottom-4 left-4'
+      'bottom-left': 'bottom-4 left-4',
+      'top-center': 'top-4 left-1/2 -translate-x-1/2',
+      'bottom-center': 'bottom-4 left-1/2 -translate-x-1/2'
     };
-    return positionMap[position] || positionMap['top-right'];
+    return positionMap[position] || positionMap['bottom-center'];
+  };
+
+  // ✅ animation from bottom for center positions
+  const getAnimationClass = () => {
+    const centerTopBottom = ['top-center', 'bottom-center'];
+    if (centerTopBottom.includes(position)) {
+      return position === 'bottom-center'
+        ? 'animate-in slide-in-from-bottom-full duration-300'
+        : 'animate-in slide-in-from-top-full duration-300';
+    }
+    return 'animate-in slide-in-from-right-full duration-300';
   };
 
   const { icon: IconComponent, color, bgColor, borderColor } = getIconConfig();
   const positionClasses = getPositionClasses();
+  const animationClass = getAnimationClass();
 
   return (
     <div
       className={`
         fixed z-50 max-w-sm w-full sm:max-w-md
-        animate-in slide-in-from-right-full duration-300
+        ${animationClass}
         ${positionClasses}
       `}
       role="alert"
@@ -119,19 +113,13 @@ const ToastNotification = ({
           color: colors.textHigh
         }}
       >
-        {/* Icon */}
         <div
           className="flex-shrink-0 mt-0.5 rounded-full p-1"
           style={{ backgroundColor: bgColor }}
         >
-          <IconComponent
-            size={20}
-            style={{ color }}
-            aria-hidden="true"
-          />
+          <IconComponent size={20} style={{ color }} aria-hidden="true" />
         </div>
 
-        {/* Content */}
         <div className="flex-1 min-w-0">
           {title && (
             <h3
@@ -147,16 +135,9 @@ const ToastNotification = ({
           >
             {message}
           </p>
-          
-          {/* Action Button */}
-          {action && (
-            <div className="mt-2">
-              {action}
-            </div>
-          )}
+          {action && <div className="mt-2">{action}</div>}
         </div>
 
-        {/* Close Button */}
         {showCloseButton && (
           <button
             onClick={onClose}
@@ -164,18 +145,13 @@ const ToastNotification = ({
               flex-shrink-0 ml-2 p-1 rounded-md transition-colors
               hover:bg-opacity-20 focus:outline-none focus:ring-2 focus:ring-offset-2
             `}
-            style={{
-              color: colors.textLow,
-              hoverBackground: isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)',
-              focusRingColor: colors.primary
-            }}
+            style={{ color: colors.textLow }}
             aria-label="Close notification"
           >
             <X size={16} aria-hidden="true" />
           </button>
         )}
 
-        {/* Progress Bar (for auto-hide) */}
         {duration > 0 && (
           <div
             className="absolute bottom-0 left-0 h-1 rounded-b-lg origin-left"
@@ -192,7 +168,6 @@ const ToastNotification = ({
         )}
       </div>
 
-      {/* CSS Animation for Progress Bar */}
       <style>{`
         @keyframes shrinkWidth {
           from { width: 100%; }

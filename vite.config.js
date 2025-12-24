@@ -6,23 +6,31 @@ import tailwindcss from '@tailwindcss/vite'
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '')
   const pid = env.VITE_FIREBASE_PROJECT_ID
-  const proxyTarget = env.VITE_API_PROXY_TARGET || (pid ? `https://us-central1-${pid}.cloudfunctions.net` : undefined)
+  const functionsProxyTarget = env.VITE_FUNCTIONS_PROXY_TARGET || (pid ? `https://us-central1-${pid}.cloudfunctions.net` : undefined)
+  const backendProxyTarget = env.VITE_DEV_BACKEND_TARGET || env.VITE_BACKEND_URL || 'http://localhost:3000'
+
+  const proxy = {}
+
+  if (functionsProxyTarget) {
+    proxy['/__api'] = {
+      target: functionsProxyTarget,
+      changeOrigin: true,
+      secure: true,
+      rewrite: (path) => path.replace(/^\/__api/, '/api'),
+    }
+  }
+
+  proxy['/api'] = {
+    target: backendProxyTarget,
+    changeOrigin: true,
+    secure: false,
+  }
 
   return {
     plugins: [react(), tailwindcss()],
-    server: proxyTarget
-      ? {
-          proxy: {
-            // Route client requests starting with /__api to Cloud Functions
-            '/__api': {
-              target: proxyTarget,
-              changeOrigin: true,
-              secure: true,
-              rewrite: (path) => path.replace(/^\/__api/, '/api'),
-            },
-          },
-        }
-      : undefined,
+    server: {
+      proxy,
+    },
     build: {
       rollupOptions: {
         output: {

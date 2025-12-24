@@ -1,8 +1,8 @@
-// src/firebase/schema.js
+// src/utils/schema.js
 
 /**
  * Schema Validation and Default Data Generation Helpers
- * * NOTE: These functions use basic JS validation for simplicity.
+ * NOTE: These functions use basic JS validation for simplicity.
  * For production, replace these with a robust schema validation library (Zod, Yup, Joi).
  */
 
@@ -33,22 +33,23 @@ export const validateUserData = (data) => {
 
 /**
  * Generates default user data upon creation.
+ * @param {Object} user - User object with basic properties
  */
-export const generateDefaultUserData = (firebaseUser) => {
-    const emailParts = firebaseUser.email ? firebaseUser.email.split('@') : [];
-    const defaultName = firebaseUser.displayName || emailParts[0] || 'New User';
+export const generateDefaultUserData = (user) => {
+    const emailParts = user.email ? user.email.split('@') : [];
+    const defaultName = user.displayName || emailParts[0] || 'New User';
 
     return {
-        uid: firebaseUser.uid,
-        email: firebaseUser.email,
+        uid: user.uid || user.id,
+        email: user.email,
         name: defaultName,
-        photoURL: firebaseUser.photoURL || '',
+        photoURL: user.photoURL || '',
         role: 'user', // Default role
         college: '',
         skills: [],
         totalCoursesEnrolled: 0,
         isAdmin: false,
-        createdAt: new Date(), // Will be overwritten by serverTimestamp() in service
+        createdAt: new Date(),
     };
 };
 
@@ -92,7 +93,7 @@ export const generateDefaultEnrollmentData = (userId, courseId, courseTitle, pay
         status: 'PENDING', // Will be updated to 'SUCCESS' after payment confirmation
         paymentId: paymentData?.paymentId || 'N/A',
         amount: paymentData?.amount || 0,
-        enrolledAt: new Date(), // Will be overwritten by serverTimestamp() in service
+        enrolledAt: new Date(),
         progress: {
             modulesCompleted: 0,
             totalModules: 0, // Should be filled in post-creation or from course data

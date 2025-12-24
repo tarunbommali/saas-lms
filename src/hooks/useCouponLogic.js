@@ -1,12 +1,13 @@
 // src/hooks/useCouponLogic.js
 
 import { useState, useEffect, useCallback } from 'react';
-import { 
-    getAllActiveCoupons, 
-    createCoupon, 
-    updateCoupon, 
-    deleteCoupon 
-} from '../firebase/services.js'; 
+import {
+    getAllCoupons,
+    getAllActiveCoupons,
+    createCoupon,
+    updateCoupon,
+    deleteCoupon
+} from '../services/index.js';
 
 const initialFormData = {
     code: '',
@@ -32,6 +33,41 @@ const formatDateForInput = (date) => {
     return d.toISOString().split('T')[0];
 };
 
+const toNumber = (value, fallback = 0) => {
+    const numeric = Number(value);
+    return Number.isFinite(numeric) ? numeric : fallback;
+};
+
+const toOptionalNumber = (value) => {
+    if (value === null || value === undefined) return null;
+    const numeric = Number(value);
+    return Number.isFinite(numeric) ? numeric : null;
+};
+
+const toDateOrNull = (value) => {
+    if (!value) return null;
+    const candidate = value.toDate ? value.toDate() : new Date(value);
+    return Number.isNaN(candidate?.getTime?.()) ? null : candidate;
+};
+
+const ensureArray = (value) => (Array.isArray(value) ? value : []);
+
+const normalizeCouponRecord = (coupon = {}) => ({
+    ...coupon,
+    value: toNumber(coupon.value, 0),
+    minOrderAmount: toNumber(coupon.minOrderAmount, 0),
+    maxDiscountAmount: toOptionalNumber(coupon.maxDiscountAmount),
+    usageLimit: toOptionalNumber(coupon.usageLimit),
+    usageLimitPerUser: toOptionalNumber(coupon.usageLimitPerUser ?? 1) ?? 1,
+    usedCount: toNumber(coupon.usedCount, 0),
+    totalDiscountGiven: toNumber(coupon.totalDiscountGiven, 0),
+    totalOrders: toNumber(coupon.totalOrders, 0),
+    validFrom: coupon.validFrom === null ? null : toDateOrNull(coupon.validFrom),
+    validUntil: coupon.validUntil === null ? null : toDateOrNull(coupon.validUntil),
+    applicableCourses: ensureArray(coupon.applicableCourses),
+    applicableCategories: ensureArray(coupon.applicableCategories),
+});
+
 export const useCouponLogic = () => {
     const [coupons, setCoupons] = useState([]);
     const [loading, setLoading] = useState(false);
@@ -49,15 +85,21 @@ export const useCouponLogic = () => {
             setLoading(true);
             setError(null);
             
-            const result = await getAllActiveCoupons();
+            let result = await getAllCoupons();
+            if (!result.success) {
+                result = await getAllActiveCoupons();
+            }
             if (result.success) {
-                setCoupons(result.data);
+                const normalizedCoupons = Array.isArray(result.data)
+                    ? result.data.map(normalizeCouponRecord)
+                    : [];
+                setCoupons(normalizedCoupons);
             } else {
                 setError(result.error);
             }
         } catch (err) {
-            console.error('Failed to fetch coupons:', err);
-            setError('Failed to load coupons');
+            const message = err?.message ? ` (${err.message})` : '';
+            setError(`Failed to load coupons${message}`);
         } finally {
             setLoading(false);
         }
@@ -129,9 +171,10 @@ export const useCouponLogic = () => {
             return { success: true };
 
         } catch (err) {
-            console.error('Failed to save coupon:', err);
-            setError('Failed to save coupon. Check console for details.');
-            return { success: false, error: 'Failed to save coupon.' };
+            const message = err?.message ? ` (${err.message})` : '';
+            const errorMessage = `Failed to save coupon.${message}`;
+            setError(errorMessage);
+            return { success: false, error: errorMessage };
         } finally {
             setLoading(false);
         }
@@ -148,8 +191,8 @@ export const useCouponLogic = () => {
                 setError(result.error);
             }
         } catch (err) {
-            console.error('Failed to delete coupon:', err);
-            setError('Failed to delete coupon');
+            const message = err?.message ? ` (${err.message})` : '';
+            setError(`Failed to delete coupon${message}`);
         } finally {
             setLoading(false);
         }

@@ -1,5 +1,5 @@
-import React, { createContext, useContext } from 'react';
-import { useUserEnrollments } from '../hooks/useFirebase';
+import { createContext, useContext } from 'react';
+import { useUserEnrollments } from '../hooks/useApiData.js';
 import { useAuth } from './AuthContext';
 
 const UserContext = createContext(undefined);
@@ -11,7 +11,7 @@ export const useUser = () => {
 };
 
 export const UserProvider = ({ children }) => {
-  const { currentUser, isAuthenticated } = useAuth();
+  const { currentUser } = useAuth();
   const { enrollments, loading: loadingEnrollments, error: enrollmentsError, isEnrolled, refreshEnrollments } = useUserEnrollments(currentUser?.uid);
 
   const value = {
