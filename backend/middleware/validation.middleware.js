@@ -4,7 +4,6 @@
  */
 
 import { z } from 'zod';
-import { ApiError } from './errorHandler.js';
 
 /**
  * Validate request body
@@ -16,8 +15,10 @@ export const validateBody = (schema) => {
       next();
     } catch (error) {
       if (error instanceof z.ZodError) {
-        const errors = error.errors.map((err) => ({
-          field: err.path.join('.'),
+        // Zod v4 uses 'issues' instead of 'errors'
+        const issueList = error.issues || error.errors || [];
+        const errors = issueList.map((err) => ({
+          field: err.path?.join('.') || '',
           message: err.message,
         }));
         
@@ -42,8 +43,9 @@ export const validateQuery = (schema) => {
       next();
     } catch (error) {
       if (error instanceof z.ZodError) {
-        const errors = error.errors.map((err) => ({
-          field: err.path.join('.'),
+        const issueList = error.issues || error.errors || [];
+        const errors = issueList.map((err) => ({
+          field: err.path?.join('.') || '',
           message: err.message,
         }));
         
@@ -68,8 +70,9 @@ export const validateParams = (schema) => {
       next();
     } catch (error) {
       if (error instanceof z.ZodError) {
-        const errors = error.errors.map((err) => ({
-          field: err.path.join('.'),
+        const issueList = error.issues || error.errors || [];
+        const errors = issueList.map((err) => ({
+          field: err.path?.join('.') || '',
           message: err.message,
         }));
         
