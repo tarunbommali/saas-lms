@@ -279,8 +279,9 @@ const App = () => {
                       {/* 404 Fallback */}
                       <Route path="*" element={<NotFound />} />
                     </Routes>
-                  </AppLayout>
-                </RealtimeProvider>
+                    </AppLayout>
+                  </RealtimeProvider>
+                </LearningProvider>
               </LearnPageProvider>
             </PaymentProvider>
           </CourseProvider>
