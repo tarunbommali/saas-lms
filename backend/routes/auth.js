@@ -38,11 +38,16 @@ router.post('/signup', async (req, res) => {
       return res.status(400).json({ error: 'Email and password are required' });
     }
 
+    // Validate password strength
+    if (password.length < 8) {
+      return res.status(400).json({ error: 'Password must be at least 8 characters long' });
+    }
+
     const normalizedEmail = normalizeEmail(email);
 
     const existingUser = await db.select().from(users).where(eq(users.email, normalizedEmail)).limit(1);
     if (existingUser.length > 0) {
-      return res.status(400).json({ error: 'User already exists' });
+      return res.status(400).json({ error: 'User already exists with this email' });
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
@@ -63,13 +68,22 @@ router.post('/signup', async (req, res) => {
 
     const [newUser] = await db.select().from(users).where(eq(users.id, userId)).limit(1);
 
+    // Send welcome email (non-blocking)
+    sendWelcomeEmail(normalizedEmail, resolvedDisplayName).catch(err => {
+      console.error('Welcome email failed:', err);
+    });
+
     const token = generateToken({
       id: newUser.id,
       email: newUser.email,
       isAdmin: newUser.isAdmin || false,
     });
 
-    res.status(201).json({ user: sanitizeUser(newUser), token });
+    res.status(201).json({ 
+      user: sanitizeUser(newUser), 
+      token,
+      message: 'Account created successfully'
+    });
   } catch (error) {
     console.error('Signup error:', error);
     res.status(500).json({ error: 'Failed to create user' });
