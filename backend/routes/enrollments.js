@@ -6,6 +6,8 @@ import { db } from '../db/index.js';
 import { enrollments, certifications, users } from '../db/schema.js';
 import { authenticateToken, requireAdmin } from '../middleware/auth.js';
 import { sendEnrollmentEmail } from '../services/email.js';
+import { validateBody, validateUUID } from '../middleware/validation.middleware.js';
+import { CreateEnrollmentDTO } from '../dto/index.js';
 
 const router = Router();
 
