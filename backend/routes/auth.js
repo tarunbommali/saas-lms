@@ -100,7 +100,7 @@ router.post('/signup', validateBody(SignupDTO), async (req, res) => {
   }
 });
 
-router.post('/login', async (req, res) => {
+router.post('/login', validateBody(LoginDTO), async (req, res) => {
   try {
     const { email, password } = req.body;
 
