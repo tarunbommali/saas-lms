@@ -187,6 +187,15 @@ export const PaginationDTO = z.object({
 });
 
 export default {
+  // Auth DTOs
+  SignupDTO,
+  LoginDTO,
+  ForgotPasswordDTO,
+  VerifyOtpDTO,
+  ResetPasswordDTO,
+  UpdateProfileDTO,
+  GoogleAuthDTO,
+  // Module DTOs
   CreateModuleDTO,
   UpdateModuleDTO,
   ReorderModulesDTO,
