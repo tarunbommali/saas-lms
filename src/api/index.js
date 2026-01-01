@@ -6,4 +6,7 @@ export * as couponsApi from './coupons.js';
 export * as usersApi from './users.js';
 export * as progressApi from './progress.js';
 export * as certificationsApi from './certifications.js';
+export * as modulesApi from './modules.js';
+export * as quizzesApi from './quizzes.js';
+export * as learningProgressApi from './learningProgress.js';
 export { default as apiClient } from './client.js';
