@@ -17,7 +17,8 @@ import adminRealtimeRoutes from './routes/adminRealtime.js';
 import publicRealtimeRoutes from './routes/publicRealtime.js';
 import progressRoutes from './routes/progress.js';
 import { dbReady } from "./db/index.js";
-import { notFound, errorHandler } from "./middleware/error.js";\nimport { notFound as notFoundNew, errorHandler as errorHandlerNew } from "./middleware/errorHandler.js";
+import { notFound, errorHandler } from "./middleware/error.js";
+import { notFound as notFoundNew, errorHandler as errorHandlerNew } from "./middleware/errorHandler.js";
 
 const app = express();
 const PORT = process.env.PORT || 3000;
