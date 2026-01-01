@@ -212,3 +212,188 @@ export const coupons = mysqlTable('coupons', {
   totalOrders: int('total_orders').notNull().default(0),
   ...withTimestamps(),
 });
+
+// =====================================================
+// LMS Schema - Modules, Quizzes, Progress Tracking
+// =====================================================
+
+/**
+ * Course Modules - Standalone modules for structured learning
+ */
+export const courseModules = mysqlTable('course_modules', {
+  id: uuidPrimary('id').primaryKey(),
+  courseId: varchar('course_id', 36)
+    .notNull()
+    .references(() => courses.id, { onDelete: 'cascade' }),
+  title: varchar('title', 255).notNull(),
+  description: text('description'),
+  summary: text('summary'),
+  orderIndex: int('order_index').notNull().default(1),
+  duration: int('duration_minutes').default(0), // Duration in minutes
+  contentType: varchar('content_type', 32).notNull().default('video'), // video, text, quiz, assignment
+  contentUrl: text('content_url'), // URL for video/resource
+  contentData: json('content_data'), // Additional content data
+  isFreePreview: boolean('is_free_preview').notNull().default(false),
+  isPublished: boolean('is_published').notNull().default(false),
+  requiresPreviousCompletion: boolean('requires_previous_completion').notNull().default(true), // Gated learning
+  passingScore: int('passing_score').default(70), // For quizzes
+  resources: json('resources').default(sql`(JSON_ARRAY())`), // Additional resources
+  ...withTimestamps(),
+});
+
+/**
+ * Module Lessons - Individual lessons within a module
+ */
+export const moduleLessons = mysqlTable('module_lessons', {
+  id: uuidPrimary('id').primaryKey(),
+  moduleId: varchar('module_id', 36)
+    .notNull()
+    .references(() => courseModules.id, { onDelete: 'cascade' }),
+  title: varchar('title', 255).notNull(),
+  description: text('description'),
+  orderIndex: int('order_index').notNull().default(1),
+  duration: int('duration_minutes').default(0),
+  contentType: varchar('content_type', 32).notNull().default('video'), // video, text, document, quiz
+  contentUrl: text('content_url'),
+  contentData: json('content_data'),
+  isFreePreview: boolean('is_free_preview').notNull().default(false),
+  isPublished: boolean('is_published').notNull().default(false),
+  ...withTimestamps(),
+});
+
+/**
+ * Quizzes - Quiz definitions linked to modules or courses
+ */
+export const quizzes = mysqlTable('quizzes', {
+  id: uuidPrimary('id').primaryKey(),
+  courseId: varchar('course_id', 36)
+    .notNull()
+    .references(() => courses.id, { onDelete: 'cascade' }),
+  moduleId: varchar('module_id', 36)
+    .references(() => courseModules.id, { onDelete: 'cascade' }), // Optional: quiz can be course-level or module-level
+  title: varchar('title', 255).notNull(),
+  description: text('description'),
+  instructions: text('instructions'),
+  passingScore: int('passing_score').notNull().default(70), // Percentage
+  timeLimit: int('time_limit_minutes'), // NULL = no time limit
+  maxAttempts: int('max_attempts'), // NULL = unlimited
+  shuffleQuestions: boolean('shuffle_questions').notNull().default(false),
+  shuffleOptions: boolean('shuffle_options').notNull().default(false),
+  showCorrectAnswers: boolean('show_correct_answers').notNull().default(true), // Show after submission
+  showScore: boolean('show_score').notNull().default(true),
+  isRequired: boolean('is_required').notNull().default(true), // Required to pass module
+  isPublished: boolean('is_published').notNull().default(false),
+  orderIndex: int('order_index').notNull().default(1),
+  totalQuestions: int('total_questions').notNull().default(0),
+  totalPoints: int('total_points').notNull().default(0),
+  ...withTimestamps(),
+});
+
+/**
+ * Quiz Questions - Individual questions for quizzes
+ */
+export const quizQuestions = mysqlTable('quiz_questions', {
+  id: uuidPrimary('id').primaryKey(),
+  quizId: varchar('quiz_id', 36)
+    .notNull()
+    .references(() => quizzes.id, { onDelete: 'cascade' }),
+  questionText: text('question_text').notNull(),
+  questionType: varchar('question_type', 32).notNull().default('multiple_choice'), // multiple_choice, true_false, short_answer, multiple_select
+  options: json('options').default(sql`(JSON_ARRAY())`), // Array of options for MCQ
+  correctAnswer: text('correct_answer').notNull(), // Single answer or JSON for multiple
+  explanation: text('explanation'), // Explanation shown after answer
+  points: int('points').notNull().default(1),
+  orderIndex: int('order_index').notNull().default(1),
+  difficulty: varchar('difficulty', 32).default('medium'), // easy, medium, hard
+  tags: json('tags').default(sql`(JSON_ARRAY())`),
+  isActive: boolean('is_active').notNull().default(true),
+  ...withTimestamps(),
+});
+
+/**
+ * Quiz Attempts - User attempts at quizzes
+ */
+export const quizAttempts = mysqlTable('quiz_attempts', {
+  id: uuidPrimary('id').primaryKey(),
+  quizId: varchar('quiz_id', 36)
+    .notNull()
+    .references(() => quizzes.id, { onDelete: 'cascade' }),
+  userId: varchar('user_id', 36)
+    .notNull()
+    .references(() => users.id, { onDelete: 'cascade' }),
+  enrollmentId: varchar('enrollment_id', 36)
+    .references(() => enrollments.id, { onDelete: 'set null' }),
+  attemptNumber: int('attempt_number').notNull().default(1),
+  status: varchar('status', 32).notNull().default('in_progress'), // in_progress, completed, timed_out, abandoned
+  score: double('score').default(0), // Percentage score
+  pointsEarned: int('points_earned').default(0),
+  totalPoints: int('total_points').default(0),
+  correctAnswers: int('correct_answers').default(0),
+  totalQuestions: int('total_questions').default(0),
+  passed: boolean('passed').notNull().default(false),
+  answers: json('answers').default(sql`(JSON_OBJECT())`), // {questionId: userAnswer}
+  questionResults: json('question_results').default(sql`(JSON_ARRAY())`), // Detailed results per question
+  timeSpentSeconds: int('time_spent_seconds').default(0),
+  startedAt: datetime('started_at').notNull().default(sql`CURRENT_TIMESTAMP`),
+  submittedAt: datetime('submitted_at'),
+  gradedAt: datetime('graded_at'),
+  gradedBy: varchar('graded_by', 36), // For manual grading
+  feedback: text('feedback'),
+  ...withTimestamps(),
+});
+
+/**
+ * User Module Progress - Detailed progress per module
+ */
+export const userModuleProgress = mysqlTable('user_module_progress', {
+  id: uuidPrimary('id').primaryKey(),
+  userId: varchar('user_id', 36)
+    .notNull()
+    .references(() => users.id, { onDelete: 'cascade' }),
+  courseId: varchar('course_id', 36)
+    .notNull()
+    .references(() => courses.id, { onDelete: 'cascade' }),
+  moduleId: varchar('module_id', 36)
+    .notNull()
+    .references(() => courseModules.id, { onDelete: 'cascade' }),
+  enrollmentId: varchar('enrollment_id', 36)
+    .references(() => enrollments.id, { onDelete: 'set null' }),
+  status: varchar('status', 32).notNull().default('not_started'), // not_started, in_progress, completed, locked
+  progressPercentage: double('progress_percentage').notNull().default(0),
+  isUnlocked: boolean('is_unlocked').notNull().default(false),
+  isCompleted: boolean('is_completed').notNull().default(false),
+  completedAt: datetime('completed_at'),
+  lastAccessedAt: datetime('last_accessed_at'),
+  timeSpentMinutes: int('time_spent_minutes').notNull().default(0),
+  quizScore: double('quiz_score'), // Best quiz score for this module
+  quizPassed: boolean('quiz_passed').notNull().default(false),
+  quizAttempts: int('quiz_attempts').notNull().default(0),
+  ...withTimestamps(),
+});
+
+/**
+ * User Lesson Progress - Detailed progress per lesson
+ */
+export const userLessonProgress = mysqlTable('user_lesson_progress', {
+  id: uuidPrimary('id').primaryKey(),
+  userId: varchar('user_id', 36)
+    .notNull()
+    .references(() => users.id, { onDelete: 'cascade' }),
+  moduleId: varchar('module_id', 36)
+    .notNull()
+    .references(() => courseModules.id, { onDelete: 'cascade' }),
+  lessonId: varchar('lesson_id', 36)
+    .notNull()
+    .references(() => moduleLessons.id, { onDelete: 'cascade' }),
+  enrollmentId: varchar('enrollment_id', 36)
+    .references(() => enrollments.id, { onDelete: 'set null' }),
+  status: varchar('status', 32).notNull().default('not_started'), // not_started, in_progress, completed
+  progressPercentage: double('progress_percentage').notNull().default(0),
+  isCompleted: boolean('is_completed').notNull().default(false),
+  completedAt: datetime('completed_at'),
+  lastAccessedAt: datetime('last_accessed_at'),
+  lastPosition: int('last_position').default(0), // For videos: last watched position in seconds
+  timeSpentMinutes: int('time_spent_minutes').notNull().default(0),
+  notes: text('notes'), // User's notes for this lesson
+  ...withTimestamps(),
+});
