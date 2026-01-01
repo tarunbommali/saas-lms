@@ -39,15 +39,20 @@ const CoursePage = () => {
         (course) => course.isPublished === true || course.status === "published"
       )
       .map((course) => {
+        // Parse modules if it's a JSON string
+        const modules = typeof course.modules === 'string' 
+          ? JSON.parse(course.modules || '[]') 
+          : (course.modules || []);
+        
         // Calculate total lessons from modules
         const totalLessons =
-          course.modules?.reduce((total, module) => {
+          modules?.reduce((total, module) => {
             return total + (module.lessons?.length || 0);
           }, 0) || 0;
 
         // Calculate total duration from modules
         const totalDuration =
-          course.modules?.reduce((total, module) => {
+          modules?.reduce((total, module) => {
             const match = module.duration?.match(/(\d+)\s*hour/i);
             const moduleHours = match ? parseInt(match[1]) : 0;
             return total + moduleHours;
@@ -55,7 +60,7 @@ const CoursePage = () => {
 
         // Transform modules to match the expected format
         const transformedModules =
-          course.modules?.map((module) => ({
+          modules?.map((module) => ({
             moduleKey: module.id,
             moduleTitle: module.title,
             videos:
