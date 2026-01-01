@@ -222,7 +222,7 @@ router.post('/verify-otp', async (req, res) => {
     }
 
     const normalizedEmail = normalizeEmail(email);
-    const hashedOtp = createHash('sha256').update(otp.toString()).digest('hex');
+    const hashedOtp = hashOTP(otp.toString());
 
     const [user] = await db
       .select()
@@ -234,18 +234,11 @@ router.post('/verify-otp', async (req, res) => {
       return res.status(400).json({ error: 'Invalid OTP' });
     }
 
-    const expiresAt = user.passwordResetExpires instanceof Date
-      ? user.passwordResetExpires
-      : user.passwordResetExpires
-        ? new Date(user.passwordResetExpires)
-        : null;
+    // Use the OTP verification service
+    const verification = verifyOTP(otp.toString(), user.passwordResetToken, user.passwordResetExpires);
 
-    if (!expiresAt || expiresAt.getTime() < Date.now()) {
-      return res.status(400).json({ error: 'OTP has expired. Please request a new one.' });
-    }
-
-    if (user.passwordResetToken !== hashedOtp) {
-      return res.status(400).json({ error: 'Invalid OTP' });
+    if (!verification.valid) {
+      return res.status(400).json({ error: verification.error });
     }
 
     // Generate a temporary reset token for the reset-password step
@@ -267,8 +260,9 @@ router.post('/verify-otp', async (req, res) => {
 
     res.json({
       success: true,
-      message: 'OTP verified successfully',
+      message: 'OTP verified successfully. You can now reset your password.',
       resetToken, // Client uses this for the final reset step
+      expiresAt: newExpiry.toISOString(),
     });
   } catch (error) {
     console.error('Verify OTP error:', error);
