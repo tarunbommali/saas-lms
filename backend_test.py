@@ -44,6 +44,11 @@ TEST_COURSE_DATA = {
     "whatYouLearn": ["API testing", "Backend validation"]
 }
 
+# Existing test data from review request
+EXISTING_COURSE_ID = "80f49e63-b381-426c-8196-bbc09cfad7c8"
+EXISTING_MODULE_ID = "d12641ba-e8c5-4adb-940c-150e938a8e99"
+EXISTING_QUIZ_ID = "3a721760-a873-4c55-9c2e-c0dd41708a33"
+
 class APITester:
     def __init__(self):
         self.session = requests.Session()
