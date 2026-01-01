@@ -1072,6 +1072,17 @@ class APITester:
             self.log("\n📊 Testing Progress APIs...")
             self.test_progress_apis()
             
+            # NEW LMS API tests
+            self.log("\n🏗️ Testing NEW LMS APIs...")
+            self.test_lms_modules_apis()
+            self.test_lms_quizzes_apis()
+            self.test_lms_quiz_taking_workflow()
+            self.test_lms_learning_progress_apis()
+            self.test_lms_admin_vs_user_access()
+            
+            # LMS Cleanup
+            self.test_lms_cleanup()
+            
             # Cleanup
             self.test_cleanup()
             
