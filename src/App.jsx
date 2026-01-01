@@ -80,9 +80,10 @@ const App = () => {
             <CourseProvider>
               <PaymentProvider>
                 <LearnPageProvider>
-                  <RealtimeProvider>
-                    <AppLayout>
-                    <Routes>
+                  <LearningProvider>
+                    <RealtimeProvider>
+                      <AppLayout>
+                      <Routes>
                       {/* Public Routes */}
                       <Route path="/" element={<LandingPage />} />
                       <Route path="/courses" element={<CoursePage />} />
