@@ -5,6 +5,8 @@ import bcrypt from 'bcryptjs';
 import { randomUUID } from 'crypto';
 import * as schema from './schema.js';
 
+import 'dotenv/config';
+
 const {
   DB_HOST = 'localhost',
   DB_USER = 'root',
