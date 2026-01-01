@@ -20,6 +20,7 @@ import { PaymentProvider } from "./contexts/PaymentContext.jsx";
 import { LearnPageProvider } from "./contexts/LearnPageContext.jsx";
 import { RealtimeProvider } from "./contexts/RealtimeContext.jsx";
 import { ToastProvider } from "./contexts/ToastContext.jsx";
+import { LearningProvider } from "./contexts/LearningContext.jsx";
 
 // ----------------------------
 // Public Pages
