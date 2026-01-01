@@ -85,9 +85,9 @@ app.use('/api/admin/realtime', adminRealtimeRoutes);
 app.use('/api/public/realtime', publicRealtimeRoutes);
 app.use('/api/progress', progressRoutes);
 
-// Error Handling
-app.use(notFound);
-app.use(errorHandler);
+// Error Handling - Use enhanced error handlers
+app.use(notFoundNew);
+app.use(errorHandlerNew);
 
 const startServer = async () => {
   try {
