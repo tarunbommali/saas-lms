@@ -508,6 +508,139 @@ export const getSecureVideoAccessUrl = async (_userId, courseId, payload) => {
   }
 };
 
+// =====================================================
+// LMS Services - Modules, Quizzes, Learning Progress
+// =====================================================
+
+// Module Services
+export const getModulesByCourse = async (courseId) => {
+  try {
+    const modules = await modulesApi.getModulesByCourse(courseId);
+    return wrapSuccess(modules);
+  } catch (error) {
+    return wrapFailure(error, { details: error?.payload });
+  }
+};
+
+export const getModuleById = async (moduleId) => {
+  try {
+    const module = await modulesApi.getModuleById(moduleId);
+    return wrapSuccess(module);
+  } catch (error) {
+    return wrapFailure(error, { details: error?.payload });
+  }
+};
+
+export const createModule = async (payload) => {
+  try {
+    const result = await modulesApi.createModule(payload);
+    return wrapSuccess(result);
+  } catch (error) {
+    return wrapFailure(error, { details: error?.payload });
+  }
+};
+
+export const updateModule = async (moduleId, payload) => {
+  try {
+    const result = await modulesApi.updateModule(moduleId, payload);
+    return wrapSuccess(result);
+  } catch (error) {
+    return wrapFailure(error, { details: error?.payload });
+  }
+};
+
+export const deleteModule = async (moduleId) => {
+  try {
+    await modulesApi.deleteModule(moduleId);
+    return wrapSuccess(true);
+  } catch (error) {
+    return wrapFailure(error, { details: error?.payload });
+  }
+};
+
+// Quiz Services
+export const getQuizzesByCourse = async (courseId) => {
+  try {
+    const quizzes = await quizzesApi.getQuizzesByCourse(courseId);
+    return wrapSuccess(quizzes);
+  } catch (error) {
+    return wrapFailure(error, { details: error?.payload });
+  }
+};
+
+export const getQuizById = async (quizId) => {
+  try {
+    const quiz = await quizzesApi.getQuizById(quizId);
+    return wrapSuccess(quiz);
+  } catch (error) {
+    return wrapFailure(error, { details: error?.payload });
+  }
+};
+
+export const startQuizAttempt = async (quizId) => {
+  try {
+    const result = await quizzesApi.startQuizAttempt(quizId);
+    return wrapSuccess(result);
+  } catch (error) {
+    return wrapFailure(error, { details: error?.payload });
+  }
+};
+
+export const submitQuizAnswers = async (quizId, payload) => {
+  try {
+    const result = await quizzesApi.submitQuizAnswers(quizId, payload);
+    return wrapSuccess(result);
+  } catch (error) {
+    return wrapFailure(error, { details: error?.payload });
+  }
+};
+
+export const getQuizAttempts = async (quizId) => {
+  try {
+    const attempts = await quizzesApi.getQuizAttempts(quizId);
+    return wrapSuccess(attempts);
+  } catch (error) {
+    return wrapFailure(error, { details: error?.payload });
+  }
+};
+
+// Learning Progress Services
+export const getCourseProgress = async (courseId) => {
+  try {
+    const progress = await learningProgressApi.getCourseProgress(courseId);
+    return wrapSuccess(progress);
+  } catch (error) {
+    return wrapFailure(error, { details: error?.payload });
+  }
+};
+
+export const updateModuleProgress = async (moduleId, payload) => {
+  try {
+    const result = await learningProgressApi.updateModuleProgress(moduleId, payload);
+    return wrapSuccess(result);
+  } catch (error) {
+    return wrapFailure(error, { details: error?.payload });
+  }
+};
+
+export const updateLessonProgress = async (lessonId, payload) => {
+  try {
+    const result = await learningProgressApi.updateLessonProgress(lessonId, payload);
+    return wrapSuccess(result);
+  } catch (error) {
+    return wrapFailure(error, { details: error?.payload });
+  }
+};
+
+export const completeModule = async (moduleId) => {
+  try {
+    const result = await learningProgressApi.completeModule(moduleId);
+    return wrapSuccess(result);
+  } catch (error) {
+    return wrapFailure(error, { details: error?.payload });
+  }
+};
+
 export const getProfileViaAPI = getUserProfile;
 export const updateProfileViaAPI = updateUserProfile;
 
