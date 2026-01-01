@@ -104,6 +104,11 @@ app.use('/api/admin/realtime', adminRealtimeRoutes);
 app.use('/api/public/realtime', publicRealtimeRoutes);
 app.use('/api/progress', progressRoutes);
 
+// LMS Routes - Modules, Quizzes, Progress Tracking
+app.use('/api/modules', modulesRoutes);
+app.use('/api/quizzes', quizzesRoutes);
+app.use('/api/learning-progress', learningProgressRoutes);
+
 // Error Handling - Use enhanced error handlers
 app.use(notFoundNew);
 app.use(errorHandlerNew);
