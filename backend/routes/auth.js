@@ -369,7 +369,7 @@ router.get('/me', authenticateToken, async (req, res) => {
   }
 });
 
-router.put('/profile', authenticateToken, async (req, res) => {
+router.put('/profile', authenticateToken, validateBody(UpdateProfileDTO), async (req, res) => {
   try {
     if (!req.user) {
       return res.status(401).json({ error: 'Not authenticated' });
