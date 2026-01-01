@@ -2,8 +2,9 @@
 import { Router } from 'express';
 import { randomUUID } from 'crypto';
 import { and, desc, eq } from 'drizzle-orm';
+import PDFDocument from 'pdfkit';
 import { db } from '../db/index.js';
-import { certifications, users } from '../db/schema.js';
+import { certifications, users, courses } from '../db/schema.js';
 import { authenticateToken, requireAdmin } from '../middleware/auth.js';
 import { sendCertificateIssuedEmail } from '../services/email.js';
 
