@@ -536,6 +536,501 @@ class APITester:
             else:
                 self.log(f"⚠️ Failed to delete test course: {response.status_code}")
 
+    # =====================================================
+    # NEW LMS API TESTS
+    # =====================================================
+
+    def test_lms_modules_apis(self):
+        """Test Module APIs comprehensively"""
+        self.log("\n🏗️ Testing Module APIs...")
+        
+        if not self.admin_token:
+            self.log("❌ No admin token available for module tests", "ERROR")
+            return
+            
+        admin_headers = {"Authorization": f"Bearer {self.admin_token}"}
+        user_headers = {"Authorization": f"Bearer {self.user_token}"}
+        
+        # Test 1: Get modules for existing course (public access)
+        response = self.session.get(f"{API_BASE}/modules/{EXISTING_COURSE_ID}")
+        self.assert_response(response, 200, "Get Modules for Course - Public")
+        
+        # Test 2: Create a new module (admin only)
+        module_data = {
+            "courseId": EXISTING_COURSE_ID,
+            "title": "Test Module for LMS Testing",
+            "description": "A comprehensive test module for API validation",
+            "summary": "Test module summary",
+            "orderIndex": 1,
+            "durationMinutes": 60,
+            "contentType": "video",
+            "contentUrl": "https://example.com/video.mp4",
+            "isFreePreview": False,
+            "isPublished": True,
+            "requiresPreviousCompletion": True,
+            "passingScore": 80
+        }
+        
+        response = self.session.post(f"{API_BASE}/modules", 
+                                   headers=admin_headers,
+                                   json=module_data)
+        if self.assert_response(response, 201, "Create Module - Admin"):
+            data = response.json()
+            if "module" in data and "id" in data["module"]:
+                self.test_module_id = data["module"]["id"]
+                self.log(f"✅ Module created with ID: {self.test_module_id}")
+        
+        # Test 3: Create module without admin token (should fail)
+        response = self.session.post(f"{API_BASE}/modules", json=module_data)
+        self.assert_response(response, 401, "Create Module - No Token")
+        
+        # Test 4: Create module with user token (should fail)
+        if self.user_token:
+            response = self.session.post(f"{API_BASE}/modules", 
+                                       headers=user_headers,
+                                       json=module_data)
+            self.assert_response(response, 403, "Create Module - User Token")
+        
+        # Test 5: Get single module details
+        if self.test_module_id:
+            response = self.session.get(f"{API_BASE}/modules/detail/{self.test_module_id}")
+            self.assert_response(response, 200, "Get Module Details")
+        
+        # Test 6: Update module (admin only)
+        if self.test_module_id:
+            update_data = {
+                "title": "Updated Test Module",
+                "durationMinutes": 90,
+                "passingScore": 85
+            }
+            response = self.session.put(f"{API_BASE}/modules/{self.test_module_id}",
+                                      headers=admin_headers,
+                                      json=update_data)
+            self.assert_response(response, 200, "Update Module - Admin")
+            
+            # Test update without admin
+            if self.user_token:
+                response = self.session.put(f"{API_BASE}/modules/{self.test_module_id}",
+                                          headers=user_headers,
+                                          json=update_data)
+                self.assert_response(response, 403, "Update Module - User Token")
+        
+        # Test 7: Create lesson for module
+        if self.test_module_id:
+            lesson_data = {
+                "title": "Test Lesson for Module",
+                "description": "A test lesson for API validation",
+                "orderIndex": 1,
+                "durationMinutes": 30,
+                "contentType": "video",
+                "contentUrl": "https://example.com/lesson.mp4",
+                "isFreePreview": False,
+                "isPublished": True
+            }
+            
+            response = self.session.post(f"{API_BASE}/modules/{self.test_module_id}/lessons",
+                                       headers=admin_headers,
+                                       json=lesson_data)
+            if self.assert_response(response, 201, "Create Lesson - Admin"):
+                data = response.json()
+                if "lesson" in data and "id" in data["lesson"]:
+                    self.test_lesson_id = data["lesson"]["id"]
+                    self.log(f"✅ Lesson created with ID: {self.test_lesson_id}")
+        
+        # Test 8: Get lessons for module
+        if self.test_module_id:
+            response = self.session.get(f"{API_BASE}/modules/{self.test_module_id}/lessons")
+            self.assert_response(response, 200, "Get Module Lessons")
+        
+        # Test 9: Update lesson
+        if self.test_lesson_id:
+            lesson_update = {"title": "Updated Test Lesson", "durationMinutes": 45}
+            response = self.session.put(f"{API_BASE}/modules/lessons/{self.test_lesson_id}",
+                                      headers=admin_headers,
+                                      json=lesson_update)
+            self.assert_response(response, 200, "Update Lesson - Admin")
+        
+        # Test 10: Reorder modules
+        if self.test_module_id:
+            reorder_data = {
+                "moduleOrder": [
+                    {"moduleId": self.test_module_id, "orderIndex": 2}
+                ]
+            }
+            response = self.session.put(f"{API_BASE}/modules/reorder/{EXISTING_COURSE_ID}",
+                                      headers=admin_headers,
+                                      json=reorder_data)
+            self.assert_response(response, 200, "Reorder Modules - Admin")
+
+    def test_lms_quizzes_apis(self):
+        """Test Quiz APIs comprehensively"""
+        self.log("\n📝 Testing Quiz APIs...")
+        
+        if not self.admin_token:
+            self.log("❌ No admin token available for quiz tests", "ERROR")
+            return
+            
+        admin_headers = {"Authorization": f"Bearer {self.admin_token}"}
+        user_headers = {"Authorization": f"Bearer {self.user_token}"}
+        
+        # Test 1: Get quizzes for course
+        response = self.session.get(f"{API_BASE}/quizzes/course/{EXISTING_COURSE_ID}")
+        self.assert_response(response, 200, "Get Quizzes for Course")
+        
+        # Test 2: Get quizzes for module
+        if self.test_module_id:
+            response = self.session.get(f"{API_BASE}/quizzes/module/{self.test_module_id}")
+            self.assert_response(response, 200, "Get Quizzes for Module")
+        
+        # Test 3: Create a new quiz (admin only)
+        quiz_data = {
+            "courseId": EXISTING_COURSE_ID,
+            "moduleId": self.test_module_id,
+            "title": "Test Quiz for LMS Testing",
+            "description": "A comprehensive test quiz for API validation",
+            "instructions": "Answer all questions to the best of your ability",
+            "passingScore": 70,
+            "timeLimitMinutes": 30,
+            "maxAttempts": 3,
+            "shuffleQuestions": True,
+            "shuffleOptions": True,
+            "showCorrectAnswers": True,
+            "showScore": True,
+            "isRequired": True,
+            "isPublished": True,
+            "orderIndex": 1
+        }
+        
+        response = self.session.post(f"{API_BASE}/quizzes", 
+                                   headers=admin_headers,
+                                   json=quiz_data)
+        if self.assert_response(response, 201, "Create Quiz - Admin"):
+            data = response.json()
+            if "quiz" in data and "id" in data["quiz"]:
+                self.test_quiz_id = data["quiz"]["id"]
+                self.log(f"✅ Quiz created with ID: {self.test_quiz_id}")
+        
+        # Test 4: Create quiz without admin token (should fail)
+        response = self.session.post(f"{API_BASE}/quizzes", json=quiz_data)
+        self.assert_response(response, 401, "Create Quiz - No Token")
+        
+        # Test 5: Create quiz with user token (should fail)
+        if self.user_token:
+            response = self.session.post(f"{API_BASE}/quizzes", 
+                                       headers=user_headers,
+                                       json=quiz_data)
+            self.assert_response(response, 403, "Create Quiz - User Token")
+        
+        # Test 6: Add questions to quiz
+        if self.test_quiz_id:
+            question_data = {
+                "questionText": "What is the capital of India?",
+                "questionType": "multiple_choice",
+                "options": ["Mumbai", "Delhi", "Kolkata", "Chennai"],
+                "correctAnswer": "Delhi",
+                "explanation": "Delhi is the capital city of India",
+                "points": 10,
+                "orderIndex": 1,
+                "difficulty": "easy",
+                "tags": ["geography", "india"]
+            }
+            
+            response = self.session.post(f"{API_BASE}/quizzes/{self.test_quiz_id}/questions",
+                                       headers=admin_headers,
+                                       json=question_data)
+            if self.assert_response(response, 201, "Add Question to Quiz - Admin"):
+                data = response.json()
+                if "question" in data and "id" in data["question"]:
+                    self.test_question_id = data["question"]["id"]
+                    self.log(f"✅ Question created with ID: {self.test_question_id}")
+        
+        # Test 7: Add another question for better testing
+        if self.test_quiz_id:
+            question_data2 = {
+                "questionText": "Which programming language is used for backend development?",
+                "questionType": "multiple_choice",
+                "options": ["JavaScript", "Python", "Java", "All of the above"],
+                "correctAnswer": "All of the above",
+                "explanation": "All these languages can be used for backend development",
+                "points": 10,
+                "orderIndex": 2,
+                "difficulty": "medium"
+            }
+            
+            response = self.session.post(f"{API_BASE}/quizzes/{self.test_quiz_id}/questions",
+                                       headers=admin_headers,
+                                       json=question_data2)
+            self.assert_response(response, 201, "Add Second Question to Quiz - Admin")
+        
+        # Test 8: Get quiz with questions (requires auth)
+        if self.test_quiz_id and self.user_token:
+            response = self.session.get(f"{API_BASE}/quizzes/{self.test_quiz_id}",
+                                      headers=user_headers)
+            self.assert_response(response, 200, "Get Quiz with Questions - User")
+            
+            # Verify that correct answers are hidden for non-admin
+            if response.status_code == 200:
+                data = response.json()
+                if "questions" in data and len(data["questions"]) > 0:
+                    first_question = data["questions"][0]
+                    if "correctAnswer" not in first_question or first_question["correctAnswer"] is None:
+                        self.log("✅ Correct answers properly hidden for non-admin users")
+                    else:
+                        self.log("❌ Correct answers not hidden for non-admin users", "ERROR")
+        
+        # Test 9: Update quiz
+        if self.test_quiz_id:
+            update_data = {
+                "title": "Updated Test Quiz",
+                "passingScore": 75,
+                "maxAttempts": 5
+            }
+            response = self.session.put(f"{API_BASE}/quizzes/{self.test_quiz_id}",
+                                      headers=admin_headers,
+                                      json=update_data)
+            self.assert_response(response, 200, "Update Quiz - Admin")
+        
+        # Test 10: Update question
+        if self.test_question_id:
+            question_update = {
+                "questionText": "What is the capital city of India?",
+                "points": 15,
+                "difficulty": "medium"
+            }
+            response = self.session.put(f"{API_BASE}/quizzes/questions/{self.test_question_id}",
+                                      headers=admin_headers,
+                                      json=question_update)
+            self.assert_response(response, 200, "Update Question - Admin")
+
+    def test_lms_quiz_taking_workflow(self):
+        """Test the complete quiz taking workflow"""
+        self.log("\n🎯 Testing Quiz Taking Workflow...")
+        
+        if not self.user_token or not self.test_quiz_id:
+            self.log("❌ Missing user token or quiz ID for quiz taking tests", "ERROR")
+            return
+            
+        user_headers = {"Authorization": f"Bearer {self.user_token}"}
+        
+        # Test 1: Start quiz attempt (requires enrollment)
+        response = self.session.post(f"{API_BASE}/quizzes/{self.test_quiz_id}/start",
+                                   headers=user_headers)
+        if self.assert_response(response, 201, "Start Quiz Attempt"):
+            data = response.json()
+            if "attempt" in data and "id" in data["attempt"]:
+                self.test_attempt_id = data["attempt"]["id"]
+                self.log(f"✅ Quiz attempt started with ID: {self.test_attempt_id}")
+        
+        # Test 2: Submit quiz answers
+        if self.test_attempt_id:
+            # Get the quiz questions first to know question IDs
+            quiz_response = self.session.get(f"{API_BASE}/quizzes/{self.test_quiz_id}",
+                                           headers=user_headers)
+            if quiz_response.status_code == 200:
+                quiz_data = quiz_response.json()
+                questions = quiz_data.get("questions", [])
+                
+                # Prepare answers - mix correct and incorrect for testing
+                answers = {}
+                if len(questions) >= 2:
+                    answers[questions[0]["id"]] = "Delhi"  # Correct answer
+                    answers[questions[1]["id"]] = "JavaScript"  # Incorrect answer (correct is "All of the above")
+                
+                submit_data = {
+                    "attemptId": self.test_attempt_id,
+                    "answers": answers,
+                    "timeSpentSeconds": 300
+                }
+                
+                response = self.session.post(f"{API_BASE}/quizzes/{self.test_quiz_id}/submit",
+                                           headers=user_headers,
+                                           json=submit_data)
+                if self.assert_response(response, 200, "Submit Quiz Answers"):
+                    data = response.json()
+                    score = data.get("score", 0)
+                    passed = data.get("passed", False)
+                    correct_answers = data.get("correctAnswers", 0)
+                    total_questions = data.get("totalQuestions", 0)
+                    
+                    self.log(f"✅ Quiz submitted - Score: {score}%, Correct: {correct_answers}/{total_questions}, Passed: {passed}")
+                    
+                    # Verify scoring logic
+                    if len(questions) >= 2:
+                        expected_score = 50  # 1 correct out of 2 questions
+                        if abs(score - expected_score) <= 5:  # Allow small variance
+                            self.log("✅ Quiz scoring logic working correctly")
+                        else:
+                            self.log(f"❌ Quiz scoring incorrect - Expected ~{expected_score}%, Got {score}%", "ERROR")
+        
+        # Test 3: Get user's quiz attempts
+        response = self.session.get(f"{API_BASE}/quizzes/{self.test_quiz_id}/attempts",
+                                  headers=user_headers)
+        self.assert_response(response, 200, "Get User Quiz Attempts")
+        
+        # Test 4: Get specific attempt details
+        if self.test_attempt_id:
+            response = self.session.get(f"{API_BASE}/quizzes/attempts/{self.test_attempt_id}",
+                                      headers=user_headers)
+            self.assert_response(response, 200, "Get Specific Attempt Details")
+        
+        # Test 5: Try to start another attempt (should work if under max attempts)
+        response = self.session.post(f"{API_BASE}/quizzes/{self.test_quiz_id}/start",
+                                   headers=user_headers)
+        # This should either succeed (if under max attempts) or fail with appropriate message
+        if response.status_code in [201, 400]:
+            if response.status_code == 201:
+                self.log("✅ Second quiz attempt started successfully")
+                self.results["passed"] += 1
+            else:
+                data = response.json()
+                if "Maximum attempts" in data.get("error", ""):
+                    self.log("✅ Max attempts limit working correctly")
+                    self.results["passed"] += 1
+                else:
+                    self.log(f"❌ Unexpected error on second attempt: {data.get('error')}", "ERROR")
+                    self.results["failed"] += 1
+        else:
+            self.log(f"❌ Unexpected status code for second attempt: {response.status_code}", "ERROR")
+            self.results["failed"] += 1
+
+    def test_lms_learning_progress_apis(self):
+        """Test Learning Progress APIs"""
+        self.log("\n📊 Testing Learning Progress APIs...")
+        
+        if not self.user_token:
+            self.log("❌ No user token available for progress tests", "ERROR")
+            return
+            
+        user_headers = {"Authorization": f"Bearer {self.user_token}"}
+        
+        # Test 1: Get complete course progress (requires enrollment)
+        response = self.session.get(f"{API_BASE}/learning-progress/{EXISTING_COURSE_ID}",
+                                  headers=user_headers)
+        self.assert_response(response, 200, "Get Course Learning Progress")
+        
+        # Test 2: Update module progress
+        if self.test_module_id:
+            progress_data = {
+                "progressPercentage": 50,
+                "timeSpentMinutes": 30,
+                "status": "in_progress"
+            }
+            response = self.session.put(f"{API_BASE}/learning-progress/module/{self.test_module_id}",
+                                      headers=user_headers,
+                                      json=progress_data)
+            self.assert_response(response, 200, "Update Module Progress")
+        
+        # Test 3: Update lesson progress
+        if self.test_lesson_id:
+            lesson_progress_data = {
+                "progressPercentage": 75,
+                "timeSpentMinutes": 20,
+                "lastPosition": 450,
+                "notes": "Completed video content",
+                "status": "in_progress"
+            }
+            response = self.session.put(f"{API_BASE}/learning-progress/lesson/{self.test_lesson_id}",
+                                      headers=user_headers,
+                                      json=lesson_progress_data)
+            self.assert_response(response, 200, "Update Lesson Progress")
+        
+        # Test 4: Mark module as complete (should fail if quiz required and not passed)
+        if self.test_module_id:
+            response = self.session.post(f"{API_BASE}/learning-progress/module/{self.test_module_id}/complete",
+                                       headers=user_headers)
+            # This might fail if quiz is required and not passed with sufficient score
+            if response.status_code in [200, 400]:
+                if response.status_code == 200:
+                    self.log("✅ Module marked as complete successfully")
+                    self.results["passed"] += 1
+                else:
+                    data = response.json()
+                    if "quiz" in data.get("error", "").lower():
+                        self.log("✅ Gated learning working - quiz required for completion")
+                        self.results["passed"] += 1
+                    else:
+                        self.log(f"❌ Unexpected error completing module: {data.get('error')}", "ERROR")
+                        self.results["failed"] += 1
+            else:
+                self.log(f"❌ Unexpected status code for module completion: {response.status_code}", "ERROR")
+                self.results["failed"] += 1
+        
+        # Test 5: Test without authentication
+        response = self.session.get(f"{API_BASE}/learning-progress/{EXISTING_COURSE_ID}")
+        self.assert_response(response, 401, "Get Progress - No Auth")
+
+    def test_lms_admin_vs_user_access(self):
+        """Test admin vs non-admin access control"""
+        self.log("\n🔐 Testing Admin vs User Access Control...")
+        
+        if not self.user_token:
+            self.log("❌ No user token available for access control tests", "ERROR")
+            return
+            
+        user_headers = {"Authorization": f"Bearer {self.user_token}"}
+        
+        # Test admin-only endpoints with user token (should all fail with 403)
+        admin_only_tests = [
+            ("POST", f"{API_BASE}/modules", {"courseId": EXISTING_COURSE_ID, "title": "Test"}),
+            ("PUT", f"{API_BASE}/modules/{EXISTING_MODULE_ID}", {"title": "Updated"}),
+            ("DELETE", f"{API_BASE}/modules/{EXISTING_MODULE_ID}", None),
+            ("POST", f"{API_BASE}/quizzes", {"courseId": EXISTING_COURSE_ID, "title": "Test Quiz"}),
+            ("PUT", f"{API_BASE}/quizzes/{EXISTING_QUIZ_ID}", {"title": "Updated Quiz"}),
+            ("DELETE", f"{API_BASE}/quizzes/{EXISTING_QUIZ_ID}", None),
+        ]
+        
+        for method, url, data in admin_only_tests:
+            if method == "POST":
+                response = self.session.post(url, headers=user_headers, json=data)
+            elif method == "PUT":
+                response = self.session.put(url, headers=user_headers, json=data)
+            elif method == "DELETE":
+                response = self.session.delete(url, headers=user_headers)
+            
+            endpoint_name = url.split("/")[-1] if method == "DELETE" else f"{method} {url.split('/')[-1]}"
+            self.assert_response(response, 403, f"Admin Only - {endpoint_name} (User Token)")
+
+    def test_lms_cleanup(self):
+        """Clean up LMS test data"""
+        self.log("\n🧹 Cleaning up LMS test data...")
+        
+        if not self.admin_token:
+            return
+            
+        admin_headers = {"Authorization": f"Bearer {self.admin_token}"}
+        
+        # Delete test lesson
+        if self.test_lesson_id:
+            response = self.session.delete(f"{API_BASE}/modules/lessons/{self.test_lesson_id}",
+                                         headers=admin_headers)
+            if response.status_code == 200:
+                self.log("✅ Test lesson deleted")
+            else:
+                self.log(f"⚠️ Failed to delete test lesson: {response.status_code}")
+        
+        # Delete test question
+        if self.test_question_id:
+            response = self.session.delete(f"{API_BASE}/quizzes/questions/{self.test_question_id}",
+                                         headers=admin_headers)
+            if response.status_code == 200:
+                self.log("✅ Test question deleted")
+            else:
+                self.log(f"⚠️ Failed to delete test question: {response.status_code}")
+        
+        # Delete test quiz
+        if self.test_quiz_id:
+            response = self.session.delete(f"{API_BASE}/quizzes/{self.test_quiz_id}",
+                                         headers=admin_headers)
+            if response.status_code == 200:
+                self.log("✅ Test quiz deleted")
+            else:
+                self.log(f"⚠️ Failed to delete test quiz: {response.status_code}")
+        
+        # Delete test module
+        if self.test_module_id:
+            response = self.session.delete(f"{API_BASE}/modules/{self.test_module_id}",
+                                         headers=admin_headers)
+
     def run_all_tests(self):
         """Run all tests in sequence"""
         self.log("Starting JNTU-GV Backend API Test Suite...")
