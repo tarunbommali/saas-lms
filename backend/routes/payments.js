@@ -67,30 +67,104 @@ router.get('/my-payments', authenticateToken, async (req, res) => {
   }
 });
 
-router.post('/', authenticateToken, async (req, res) => {
-  try {
-    if (!req.user) {
-      return res.status(401).json({ error: 'Not authenticated' });
-    }
-
-    const paymentRecordId = randomUUID();
-
-    await db.insert(payments).values({
-      id: paymentRecordId,
-      ...req.body,
-      userId: req.user.id,
-    }).execute();
-
-    const [newPayment] = await db.select().from(payments)
-      .where(eq(payments.id, paymentRecordId))
-      .limit(1);
-
-    res.status(201).json(newPayment);
-  } catch (error) {
-    console.error('Create payment error:', error);
-    res.status(500).json({ error: 'Failed to create payment' });
+router.post('/', authenticateToken, asyncHandler(async (req, res) => {
+  if (!req.user) {
+    return res.status(401).json({ error: 'Not authenticated' });
   }
-});
+
+  const { courseId, couponCode = null } = req.body;
+
+  // Validate payment data
+  const validation = validatePaymentData({
+    amount: req.body.amount,
+    courseId,
+    userId: req.user.id,
+  });
+
+  if (!validation.isValid) {
+    return res.status(400).json({
+      error: 'Invalid payment data',
+      details: validation.errors,
+    });
+  }
+
+  // Get course details
+  const [course] = await db.select().from(courses)
+    .where(eq(courses.id, courseId))
+    .limit(1);
+
+  if (!course) {
+    return res.status(404).json({ error: 'Course not found' });
+  }
+
+  // Calculate amount (with potential discount from coupon)
+  const orderAmount = calculateOrderAmount({
+    price: course.price,
+    discount: 0, // TODO: Apply coupon discount if valid
+    discountType: 'percentage',
+  });
+
+  // Generate receipt ID
+  const receipt = generateReceiptId('rcpt');
+
+  // Create Razorpay order
+  const razorpayOrder = await createRazorpayOrder({
+    amount: orderAmount.finalAmount,
+    currency: course.currency || 'INR',
+    receipt,
+    notes: {
+      courseId: course.id,
+      userId: req.user.id,
+      courseName: course.title,
+    },
+  });
+
+  if (!razorpayOrder.success) {
+    return res.status(500).json({
+      error: 'Failed to create payment order',
+      message: razorpayOrder.error,
+    });
+  }
+
+  // Create payment record
+  const paymentRecordId = randomUUID();
+  const now = new Date();
+
+  await db.insert(payments).values({
+    id: paymentRecordId,
+    userId: req.user.id,
+    courseId: course.id,
+    orderId: razorpayOrder.orderId,
+    amount: orderAmount.finalAmount,
+    currency: course.currency || 'INR',
+    status: 'pending',
+    method: null,
+    receipt,
+    metadata: JSON.stringify({
+      courseName: course.title,
+      originalAmount: orderAmount.originalAmount,
+      discount: orderAmount.discount,
+      couponCode,
+      mock: razorpayOrder.mock || false,
+    }),
+    createdAt: now,
+    updatedAt: now,
+  }).execute();
+
+  const [newPayment] = await db.select().from(payments)
+    .where(eq(payments.id, paymentRecordId))
+    .limit(1);
+
+  res.status(201).json({
+    payment: newPayment,
+    order: {
+      id: razorpayOrder.orderId,
+      amount: razorpayOrder.amount,
+      currency: razorpayOrder.currency,
+    },
+    keyId: process.env.RAZORPAY_KEY_ID || 'rzp_test_mock',
+  });
+}));
 
 router.put('/:paymentId', authenticateToken, async (req, res) => {
   try {
