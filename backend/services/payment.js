@@ -79,6 +79,18 @@ export const verifyRazorpaySignature = ({
 }) => {
   try {
     const keySecret = process.env.RAZORPAY_KEY_SECRET;
+    const mockMode = isMockPaymentMode();
+
+    // In mock mode, accept any signature for testing
+    if (mockMode) {
+      console.log('📦 Mock payment mode - Signature verification bypassed');
+      return { 
+        success: true, 
+        verified: true, 
+        mock: true,
+        message: 'Mock payment verified successfully'
+      };
+    }
 
     if (!keySecret) {
       console.warn('Razorpay secret not configured. Skipping signature verification.');
