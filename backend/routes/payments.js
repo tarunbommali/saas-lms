@@ -200,4 +200,80 @@ router.put('/:paymentId', authenticateToken, async (req, res) => {
   }
 });
 
+// Payment verification endpoint
+router.post('/verify', authenticateToken, asyncHandler(async (req, res) => {
+  if (!req.user) {
+    return res.status(401).json({ error: 'Not authenticated' });
+  }
+
+  const { orderId, paymentId, signature } = req.body;
+
+  if (!orderId || !paymentId || !signature) {
+    return res.status(400).json({
+      error: 'Missing required fields: orderId, paymentId, signature',
+    });
+  }
+
+  // Verify signature
+  const verification = verifyRazorpaySignature({ orderId, paymentId, signature });
+
+  if (!verification.success || !verification.verified) {
+    return res.status(400).json({
+      error: 'Payment verification failed',
+      message: verification.message || verification.error,
+    });
+  }
+
+  // Update payment record
+  const [payment] = await db.select().from(payments)
+    .where(eq(payments.orderId, orderId))
+    .limit(1);
+
+  if (!payment) {
+    return res.status(404).json({ error: 'Payment record not found' });
+  }
+
+  // Update payment status
+  await db.update(payments)
+    .set({
+      paymentId,
+      status: 'completed',
+      updatedAt: new Date(),
+    })
+    .where(eq(payments.id, payment.id))
+    .execute();
+
+  // Create enrollment if not exists
+  const [existingEnrollment] = await db.select().from(enrollments)
+    .where(and(
+      eq(enrollments.userId, req.user.id),
+      eq(enrollments.courseId, payment.courseId)
+    ))
+    .limit(1);
+
+  if (!existingEnrollment) {
+    const enrollmentId = randomUUID();
+    await db.insert(enrollments).values({
+      id: enrollmentId,
+      userId: req.user.id,
+      courseId: payment.courseId,
+      status: 'active',
+      progress: 0,
+      enrolledAt: new Date(),
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    }).execute();
+  }
+
+  const [updatedPayment] = await db.select().from(payments)
+    .where(eq(payments.id, payment.id))
+    .limit(1);
+
+  res.json({
+    success: true,
+    message: 'Payment verified successfully',
+    payment: updatedPayment,
+  });
+}));
+
 export default router;
