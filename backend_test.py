@@ -56,6 +56,11 @@ class APITester:
         self.user_token = None
         self.test_course_id = None
         self.test_enrollment_id = None
+        self.test_module_id = None
+        self.test_lesson_id = None
+        self.test_quiz_id = None
+        self.test_question_id = None
+        self.test_attempt_id = None
         self.results = {
             "passed": 0,
             "failed": 0,
