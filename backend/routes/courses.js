@@ -5,6 +5,8 @@ import { db } from '../db/index.js';
 import { courses } from '../db/schema.js';
 import { and, eq, ilike, desc } from 'drizzle-orm';
 import { authenticateToken, requireAdmin } from '../middleware/auth.js';
+import { validateBody, validateUUID } from '../middleware/validation.middleware.js';
+import { CreateCourseDTO, UpdateCourseDTO } from '../dto/index.js';
 
 const router = Router();
 
