@@ -281,7 +281,7 @@ router.post('/verify-otp', validateBody(VerifyOtpDTO), async (req, res) => {
 });
 
 
-router.post('/reset-password', async (req, res) => {
+router.post('/reset-password', validateBody(ResetPasswordDTO), async (req, res) => {
   try {
     const { token, newPassword, password } = req.body;
 
