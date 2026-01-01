@@ -23,15 +23,15 @@ import LoadingSpinner from "../../../components/ui/LoadingSpinner.jsx";
 import ToastNotification from "../../../components/ui/ToastNotification.jsx";
 
 const CourseManagement = () => {
-  const { isAdmin, currentUser } = useAuth();
-  const { 
-    courses, 
-    coursesLoading, 
-    coursesError, 
+  const { isAdmin, currentUser, loading: authLoading } = useAuth();
+  const {
+    courses,
+    coursesLoading,
+    coursesError,
     deleteCourse,
-    getCourseStats 
+    getCourseStats
   } = useCourseContext();
-  
+
   const [searchTerm, setSearchTerm] = useState("");
   const [toast, setToast] = useState({
     show: false,
@@ -68,6 +68,14 @@ const CourseManagement = () => {
     );
   };
 
+  if (authLoading || isAdmin === null || isAdmin === undefined) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-gray-50">
+        <LoadingSpinner size="lg" aria-label="Checking admin access" />
+      </div>
+    );
+  }
+
   if (!isAdmin) {
     return <Navigate to="/" replace />;
   }
@@ -82,7 +90,7 @@ const CourseManagement = () => {
     const shortDescription = course.shortDescription || description.substring(0, 100) + "...";
     const price = course.price || course.coursePrice || 0;
     const originalPrice = course.originalPrice || course.coursePrice || price;
-    
+
     // Calculate total lessons from modules
     const totalLessons = course.modules?.reduce((total, module) => {
       return total + (module.lessons?.length || module.videos?.length || 0);
@@ -220,7 +228,7 @@ const CourseManagement = () => {
             ({stats.published} published + {stats.drafts} drafts)
           </div>
         </div>
-        
+
         <div className="bg-white p-4 rounded-lg shadow border border-gray-200 text-center">
           <Eye className="w-8 h-8 text-green-600 mx-auto mb-2" />
           <div className="text-2xl font-bold text-gray-900">
@@ -231,7 +239,7 @@ const CourseManagement = () => {
             Live on platform
           </div>
         </div>
-        
+
         <div className="bg-white p-4 rounded-lg shadow border border-gray-200 text-center">
           <EyeOff className="w-8 h-8 text-yellow-600 mx-auto mb-2" />
           <div className="text-2xl font-bold text-gray-900">
@@ -242,7 +250,7 @@ const CourseManagement = () => {
             Not published yet
           </div>
         </div>
-        
+
         <div className="bg-white p-4 rounded-lg shadow border border-gray-200 text-center">
           <Users className="w-8 h-8 text-purple-600 mx-auto mb-2" />
           <div className="text-2xl font-bold text-gray-900">
@@ -259,31 +267,28 @@ const CourseManagement = () => {
       <div className="flex flex-wrap gap-2 mb-6">
         <button
           onClick={() => setSearchTerm("")}
-          className={`px-3 py-1 rounded-full text-sm font-medium transition-colors ${
-            searchTerm === "" 
-              ? "bg-blue-600 text-white" 
+          className={`px-3 py-1 rounded-full text-sm font-medium transition-colors ${searchTerm === ""
+              ? "bg-blue-600 text-white"
               : "bg-gray-200 text-gray-700 hover:bg-gray-300"
-          }`}
+            }`}
         >
           All Courses ({stats.total})
         </button>
         <button
           onClick={() => setSearchTerm("status:published")}
-          className={`px-3 py-1 rounded-full text-sm font-medium transition-colors ${
-            searchTerm === "status:published" 
-              ? "bg-green-600 text-white" 
+          className={`px-3 py-1 rounded-full text-sm font-medium transition-colors ${searchTerm === "status:published"
+              ? "bg-green-600 text-white"
               : "bg-gray-200 text-gray-700 hover:bg-gray-300"
-          }`}
+            }`}
         >
           Published ({stats.published})
         </button>
         <button
           onClick={() => setSearchTerm("status:draft")}
-          className={`px-3 py-1 rounded-full text-sm font-medium transition-colors ${
-            searchTerm === "status:draft" 
-              ? "bg-yellow-600 text-white" 
+          className={`px-3 py-1 rounded-full text-sm font-medium transition-colors ${searchTerm === "status:draft"
+              ? "bg-yellow-600 text-white"
               : "bg-gray-200 text-gray-700 hover:bg-gray-300"
-          }`}
+            }`}
         >
           Drafts ({stats.drafts})
         </button>

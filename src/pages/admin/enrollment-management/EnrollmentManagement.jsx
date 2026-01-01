@@ -21,6 +21,7 @@ import {
 import PageContainer from "../../../components/layout/PageContainer.jsx";
 import PageTitle from "../../../components/ui/PageTitle.jsx";
 import FormField from "../../../components/ui/FormField.jsx";
+import LoadingSpinner from "../../../components/ui/LoadingSpinner.jsx";
 import { useRealtimeAdminEnrollments, useRealtimeAdminUsers, useRealtimeCourses } from "../../../hooks/useRealtimeApi.js";
 import {
   getStatusIcon,
@@ -44,14 +45,15 @@ const items = [
 ];
 
 const EnrollmentManagement = () => {
-  const { isAdmin, currentUser } = useAuth();
+  const { isAdmin, currentUser, loading: authLoading } = useAuth();
+  const adminRealtimeEnabled = isAdmin && !authLoading;
   const navigate = useNavigate();
 
   // -------------------------
   // Real-time data (API / MySQL)
   // -------------------------
-  const { data: rtEnrollments, loading: enrollLoading, error: enrollError } = useRealtimeAdminEnrollments({ limitCount: 500 });
-  const { data: rtUsers, loading: usersLoading, error: usersError } = useRealtimeAdminUsers({ limitCount: 1000 });
+  const { data: rtEnrollments, loading: enrollLoading, error: enrollError } = useRealtimeAdminEnrollments({ limitCount: 500, enabled: adminRealtimeEnabled });
+  const { data: rtUsers, loading: usersLoading, error: usersError } = useRealtimeAdminUsers({ limitCount: 1000, enabled: adminRealtimeEnabled });
   const { data: rtCourses, loading: coursesLoading, error: coursesError } = useRealtimeCourses({ limitCount: 500, publishedOnly: false });
 
   // -------------------------
@@ -89,6 +91,14 @@ const EnrollmentManagement = () => {
   });
 
   // Redirect non-admins
+  if (authLoading || isAdmin === null || isAdmin === undefined) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-gray-50">
+        <LoadingSpinner size="lg" aria-label="Checking admin access" />
+      </div>
+    );
+  }
+
   if (!isAdmin) {
     return <Navigate to="/" replace />;
   }

@@ -1,9 +1,10 @@
 /* eslint-disable no-console */
+/* eslint-disable no-unused-vars */
 import { Router } from 'express';
 import { randomUUID } from 'crypto';
 import { and, eq, desc } from 'drizzle-orm';
 import { db } from '../db/index.js';
-import { enrollments, certifications, users } from '../db/schema.js';
+import { enrollments, certifications, users, coupons } from '../db/schema.js';
 import { authenticateToken, requireAdmin } from '../middleware/auth.js';
 import { sendEnrollmentEmail } from '../services/email.js';
 import { validateBody, validateUUID } from '../middleware/validation.middleware.js';
@@ -24,6 +25,8 @@ const toISODate = (value) => {
   }
   return value;
 };
+
+const normalizeCouponCode = (code) => (code || '').trim().toUpperCase();
 
 const sanitizeTaskProgress = (rawProgress = {}, { fallback = {}, reviewer } = {}) => {
   const source = rawProgress && typeof rawProgress === 'object' ? rawProgress : {};
@@ -284,6 +287,9 @@ router.post('/', authenticateToken, async (req, res) => {
     const status = (enrollmentData.status || 'SUCCESS').toUpperCase();
     const paymentMethod = (paymentData.method || '').toLowerCase();
     const resolvedAmount = Number(paymentData.amount ?? paymentData.amountPaid ?? enrollmentData.coursePrice ?? 0);
+    const resolvedCouponCodeRaw = paymentData.couponCode || enrollmentData.couponCode;
+    const normalizedCouponCode = normalizeCouponCode(resolvedCouponCodeRaw);
+    const discountAmount = Number(paymentData.couponDiscount ?? enrollmentData.couponDiscount ?? 0) || 0;
 
     const baseTaskProgress = sanitizeTaskProgress(enrollmentData.taskProgress, {
       reviewer: req.user,
@@ -301,8 +307,8 @@ router.post('/', authenticateToken, async (req, res) => {
       paymentId: paymentData.paymentId,
       amount: resolvedAmount,
       currency: paymentData.currency || enrollmentData.currency || 'INR',
-      couponCode: paymentData.couponCode || enrollmentData.couponCode,
-      couponDiscount: Number(paymentData.couponDiscount ?? enrollmentData.couponDiscount ?? 0),
+      couponCode: normalizedCouponCode || null,
+      couponDiscount: discountAmount,
       billingInfo: {
         ...paymentData,
         amountPaid: resolvedAmount,
@@ -323,6 +329,30 @@ router.post('/', authenticateToken, async (req, res) => {
     }
 
     await db.insert(enrollments).values(values).execute();
+
+    if (status === 'SUCCESS' && normalizedCouponCode) {
+      try {
+        const [couponRecord] = await db.select().from(coupons)
+          .where(eq(coupons.code, normalizedCouponCode))
+          .limit(1);
+
+        if (couponRecord) {
+          const couponUpdates = {
+            usedCount: (couponRecord.usedCount ?? 0) + 1,
+            totalOrders: (couponRecord.totalOrders ?? 0) + 1,
+            totalDiscountGiven: (couponRecord.totalDiscountGiven ?? 0) + discountAmount,
+            updatedAt: new Date(),
+          };
+
+          await db.update(coupons)
+            .set(couponUpdates)
+            .where(eq(coupons.id, couponRecord.id))
+            .execute();
+        }
+      } catch (couponError) {
+        console.error('Enrollment coupon stats update failed:', couponError);
+      }
+    }
 
     const [created] = await db.select().from(enrollments)
       .where(eq(enrollments.id, enrollmentId))

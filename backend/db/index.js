@@ -273,6 +273,7 @@ const createTablesStatements = [
     id VARCHAR(36) NOT NULL PRIMARY KEY,
     course_id VARCHAR(36) NOT NULL,
     module_id VARCHAR(36),
+    lesson_id VARCHAR(36),
     title VARCHAR(255) NOT NULL,
     description TEXT,
     instructions TEXT,
@@ -292,8 +293,10 @@ const createTablesStatements = [
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     CONSTRAINT fk_quizzes_course FOREIGN KEY (course_id) REFERENCES courses(id) ON DELETE CASCADE,
     CONSTRAINT fk_quizzes_module FOREIGN KEY (module_id) REFERENCES course_modules(id) ON DELETE CASCADE,
+    CONSTRAINT fk_quizzes_lesson FOREIGN KEY (lesson_id) REFERENCES module_lessons(id) ON DELETE SET NULL,
     INDEX idx_quizzes_course_id (course_id),
-    INDEX idx_quizzes_module_id (module_id)
+    INDEX idx_quizzes_module_id (module_id),
+    INDEX idx_quizzes_lesson_id (lesson_id)
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;`,
 
   `CREATE TABLE IF NOT EXISTS quiz_questions (
@@ -320,6 +323,7 @@ const createTablesStatements = [
     id VARCHAR(36) NOT NULL PRIMARY KEY,
     quiz_id VARCHAR(36) NOT NULL,
     user_id VARCHAR(36) NOT NULL,
+    lesson_id VARCHAR(36),
     enrollment_id VARCHAR(36),
     attempt_number INT NOT NULL DEFAULT 1,
     status VARCHAR(32) NOT NULL DEFAULT 'in_progress',
@@ -341,10 +345,12 @@ const createTablesStatements = [
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     CONSTRAINT fk_quiz_attempts_quiz FOREIGN KEY (quiz_id) REFERENCES quizzes(id) ON DELETE CASCADE,
     CONSTRAINT fk_quiz_attempts_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    CONSTRAINT fk_quiz_attempts_lesson FOREIGN KEY (lesson_id) REFERENCES module_lessons(id) ON DELETE SET NULL,
     CONSTRAINT fk_quiz_attempts_enrollment FOREIGN KEY (enrollment_id) REFERENCES enrollments(id) ON DELETE SET NULL,
     INDEX idx_quiz_attempts_quiz_user (quiz_id, user_id),
     INDEX idx_quiz_attempts_user (user_id),
-    INDEX idx_quiz_attempts_enrollment (enrollment_id)
+    INDEX idx_quiz_attempts_enrollment (enrollment_id),
+    INDEX idx_quiz_attempts_lesson (lesson_id)
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;`,
 
   `CREATE TABLE IF NOT EXISTS user_module_progress (
@@ -424,6 +430,24 @@ const ensureIndexExists = async (client, tableName, indexName, indexDefinition) 
   }
 };
 
+const ensureForeignKeyExists = async (client, tableName, constraintName, constraintDefinition) => {
+  const [rows] = await client.query(
+    `SELECT CONSTRAINT_NAME FROM INFORMATION_SCHEMA.TABLE_CONSTRAINTS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND CONSTRAINT_NAME = ?`,
+    [tableName, constraintName]
+  );
+
+  if (!rows || rows.length === 0) {
+    try {
+      await client.query(`ALTER TABLE \`${tableName}\` ADD CONSTRAINT ${constraintName} ${constraintDefinition}`);
+      console.log(`✅ Added foreign key ${constraintName} on ${tableName}`);
+    } catch (error) {
+      if (!error.message.toLowerCase().includes('duplicate')) {
+        console.warn(`⚠️ Could not add foreign key ${constraintName} on ${tableName}:`, error.message);
+      }
+    }
+  }
+};
+
 const createPerformanceIndexes = async (client) => {
   console.log('📊 Creating performance indexes...');
   
@@ -496,6 +520,22 @@ const initializeDatabase = async () => {
   await ensureColumnExists(client, 'enrollments', 'certificate_issued', 'certificate_issued TINYINT(1) NOT NULL DEFAULT 0');
   await ensureColumnExists(client, 'enrollments', 'certificate_issued_at', 'certificate_issued_at DATETIME');
   await ensureColumnExists(client, 'enrollments', 'certificate_unlocked_at', 'certificate_unlocked_at DATETIME');
+  await ensureColumnExists(client, 'quizzes', 'lesson_id', 'lesson_id VARCHAR(36)');
+  await ensureColumnExists(client, 'quiz_attempts', 'lesson_id', 'lesson_id VARCHAR(36)');
+  await ensureForeignKeyExists(
+    client,
+    'quizzes',
+    'fk_quizzes_lesson',
+    'FOREIGN KEY (lesson_id) REFERENCES module_lessons(id) ON DELETE SET NULL'
+  );
+  await ensureForeignKeyExists(
+    client,
+    'quiz_attempts',
+    'fk_quiz_attempts_lesson',
+    'FOREIGN KEY (lesson_id) REFERENCES module_lessons(id) ON DELETE SET NULL'
+  );
+  await ensureIndexExists(client, 'quizzes', 'idx_quizzes_lesson_id', '(lesson_id)');
+  await ensureIndexExists(client, 'quiz_attempts', 'idx_quiz_attempts_lesson', '(lesson_id)');
   
   // Create performance indexes
   await createPerformanceIndexes(client);

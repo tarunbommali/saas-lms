@@ -1,7 +1,7 @@
 /* eslint-disable no-console */
 import { Router } from 'express';
 import { randomUUID } from 'crypto';
-import { and, eq, asc, desc, sql } from 'drizzle-orm';
+import { and, eq, asc, desc } from 'drizzle-orm';
 import { db } from '../db/index.js';
 import { 
   quizzes, 
@@ -9,12 +9,17 @@ import {
   quizAttempts,
   courses,
   courseModules,
+  moduleLessons,
   enrollments,
   userModuleProgress,
+  userLessonProgress,
 } from '../db/schema.js';
 import { authenticateToken, requireAdmin } from '../middleware/auth.js';
 
 const router = Router();
+
+const QUIZ_CORRECT_POINTS = 5;
+const QUIZ_WRONG_PENALTY = 1;
 
 // =====================================================
 // Quiz Management (Admin)
@@ -123,6 +128,7 @@ router.post('/', authenticateToken, requireAdmin, async (req, res) => {
     const {
       courseId,
       moduleId,
+      lessonId,
       title,
       description,
       instructions,
@@ -145,10 +151,34 @@ router.post('/', authenticateToken, requireAdmin, async (req, res) => {
     }
     
     // Verify module exists if provided
+    let resolvedModuleId = moduleId;
     if (moduleId) {
       const [module] = await db.select().from(courseModules).where(eq(courseModules.id, moduleId));
       if (!module) {
         return res.status(404).json({ error: 'Module not found' });
+      }
+      if (module.courseId !== courseId) {
+        return res.status(400).json({ error: 'Module does not belong to the specified course' });
+      }
+      resolvedModuleId = module.id;
+    }
+
+    let resolvedLessonId = lessonId;
+    if (lessonId) {
+      const [lesson] = await db.select().from(moduleLessons).where(eq(moduleLessons.id, lessonId));
+      if (!lesson) {
+        return res.status(404).json({ error: 'Lesson not found' });
+      }
+      if (resolvedModuleId && lesson.moduleId !== resolvedModuleId) {
+        return res.status(400).json({ error: 'Lesson does not belong to the specified module' });
+      }
+      resolvedLessonId = lesson.id;
+      if (!resolvedModuleId) {
+        const [lessonModule] = await db.select().from(courseModules).where(eq(courseModules.id, lesson.moduleId));
+        if (!lessonModule || lessonModule.courseId !== courseId) {
+          return res.status(400).json({ error: 'Lesson module does not belong to the specified course' });
+        }
+        resolvedModuleId = lesson.moduleId;
       }
     }
     
@@ -157,7 +187,8 @@ router.post('/', authenticateToken, requireAdmin, async (req, res) => {
     await db.insert(quizzes).values({
       id: quizId,
       courseId,
-      moduleId,
+      moduleId: resolvedModuleId,
+      lessonId: resolvedLessonId,
       title,
       description,
       instructions,
@@ -200,6 +231,50 @@ router.put('/:quizId', authenticateToken, requireAdmin, async (req, res) => {
     }
     
     const updateData = {};
+
+    let resolvedModuleId = existingQuiz.moduleId;
+    let resolvedLessonId = existingQuiz.lessonId;
+
+    if (updates.moduleId !== undefined) {
+      if (!updates.moduleId) {
+        resolvedModuleId = null;
+      } else {
+        const [module] = await db.select().from(courseModules).where(eq(courseModules.id, updates.moduleId));
+        if (!module) {
+          return res.status(404).json({ error: 'Module not found' });
+        }
+        if (module.courseId !== existingQuiz.courseId) {
+          return res.status(400).json({ error: 'Module does not belong to the quiz course' });
+        }
+        resolvedModuleId = module.id;
+      }
+    }
+
+    if (updates.lessonId !== undefined) {
+      if (!updates.lessonId) {
+        resolvedLessonId = null;
+      } else {
+        const [lesson] = await db.select().from(moduleLessons).where(eq(moduleLessons.id, updates.lessonId));
+        if (!lesson) {
+          return res.status(404).json({ error: 'Lesson not found' });
+        }
+        if (resolvedModuleId && lesson.moduleId !== resolvedModuleId) {
+          return res.status(400).json({ error: 'Lesson does not belong to the specified module' });
+        }
+        // When module is not explicitly provided but lesson is, derive module
+        if (!resolvedModuleId) {
+          const [lessonModule] = await db.select().from(courseModules).where(eq(courseModules.id, lesson.moduleId));
+          if (!lessonModule || lessonModule.courseId !== existingQuiz.courseId) {
+            return res.status(400).json({ error: 'Lesson module does not belong to the quiz course' });
+          }
+          resolvedModuleId = lesson.moduleId;
+        }
+        resolvedLessonId = lesson.id;
+      }
+    }
+
+    updateData.moduleId = resolvedModuleId;
+    updateData.lessonId = resolvedLessonId;
     if (updates.title !== undefined) updateData.title = updates.title;
     if (updates.description !== undefined) updateData.description = updates.description;
     if (updates.instructions !== undefined) updateData.instructions = updates.instructions;
@@ -289,7 +364,7 @@ router.post('/:quizId/questions', authenticateToken, requireAdmin, async (req, r
     }
     
     const questionId = randomUUID();
-    
+
     await db.insert(quizQuestions).values({
       id: questionId,
       quizId,
@@ -298,7 +373,7 @@ router.post('/:quizId/questions', authenticateToken, requireAdmin, async (req, r
       options: options ? JSON.stringify(options) : '[]',
       correctAnswer: typeof correctAnswer === 'object' ? JSON.stringify(correctAnswer) : correctAnswer,
       explanation,
-      points: points || 1,
+      points: QUIZ_CORRECT_POINTS,
       orderIndex: newOrderIndex,
       difficulty: difficulty || 'medium',
       tags: tags ? JSON.stringify(tags) : '[]',
@@ -306,7 +381,7 @@ router.post('/:quizId/questions', authenticateToken, requireAdmin, async (req, r
     
     // Update quiz totals
     const allQuestions = await db.select().from(quizQuestions).where(eq(quizQuestions.quizId, quizId));
-    const totalPoints = allQuestions.reduce((sum, q) => sum + q.points, 0);
+    const totalPoints = allQuestions.length * QUIZ_CORRECT_POINTS;
     
     await db.update(quizzes).set({
       totalQuestions: allQuestions.length,
@@ -349,7 +424,9 @@ router.put('/questions/:questionId', authenticateToken, requireAdmin, async (req
         : updates.correctAnswer;
     }
     if (updates.explanation !== undefined) updateData.explanation = updates.explanation;
-    if (updates.points !== undefined) updateData.points = updates.points;
+    if (updates.points !== undefined) {
+      updateData.points = QUIZ_CORRECT_POINTS;
+    }
     if (updates.orderIndex !== undefined) updateData.orderIndex = updates.orderIndex;
     if (updates.difficulty !== undefined) updateData.difficulty = updates.difficulty;
     if (updates.tags !== undefined) updateData.tags = JSON.stringify(updates.tags);
@@ -360,7 +437,7 @@ router.put('/questions/:questionId', authenticateToken, requireAdmin, async (req
     // Update quiz totals if points changed
     if (updates.points !== undefined) {
       const allQuestions = await db.select().from(quizQuestions).where(eq(quizQuestions.quizId, existingQuestion.quizId));
-      const totalPoints = allQuestions.reduce((sum, q) => sum + q.points, 0);
+      const totalPoints = allQuestions.length * QUIZ_CORRECT_POINTS;
       await db.update(quizzes).set({ totalPoints }).where(eq(quizzes.id, existingQuestion.quizId));
     }
     
@@ -393,7 +470,7 @@ router.delete('/questions/:questionId', authenticateToken, requireAdmin, async (
     
     // Update quiz totals
     const allQuestions = await db.select().from(quizQuestions).where(eq(quizQuestions.quizId, existingQuestion.quizId));
-    const totalPoints = allQuestions.reduce((sum, q) => sum + q.points, 0);
+    const totalPoints = allQuestions.length * QUIZ_CORRECT_POINTS;
     
     await db.update(quizzes).set({
       totalQuestions: allQuestions.length,
@@ -486,6 +563,8 @@ router.post('/:quizId/start', authenticateToken, async (req, res) => {
     const attemptId = randomUUID();
     const attemptNumber = previousAttempts.length + 1;
     
+    const maxPoints = (quiz.totalQuestions || 0) * QUIZ_CORRECT_POINTS;
+
     await db.insert(quizAttempts).values({
       id: attemptId,
       quizId,
@@ -493,7 +572,7 @@ router.post('/:quizId/start', authenticateToken, async (req, res) => {
       enrollmentId: enrollment.id,
       attemptNumber,
       status: 'in_progress',
-      totalPoints: quiz.totalPoints,
+      totalPoints: maxPoints,
       totalQuestions: quiz.totalQuestions,
     });
     
@@ -543,100 +622,109 @@ router.post('/:quizId/submit', authenticateToken, async (req, res) => {
       .from(quizQuestions)
       .where(eq(quizQuestions.quizId, quizId));
     
-    // Grade the quiz
+    const maxPoints = (questions.length || 0) * QUIZ_CORRECT_POINTS;
+    const normalizedAnswers = answers && typeof answers === 'object' ? answers : {};
+    
     let correctAnswers = 0;
     let pointsEarned = 0;
     const questionResults = [];
     
     for (const question of questions) {
-      const userAnswer = answers[question.id];
+      const userAnswer = normalizedAnswers[question.id];
       const correctAnswer = question.correctAnswer;
       
-      // Parse correct answer if it's JSON
       let parsedCorrectAnswer = correctAnswer;
       try {
         parsedCorrectAnswer = JSON.parse(correctAnswer);
       } catch (e) {
-        // Not JSON, use as is
+        // Not JSON, keep as-is
       }
       
       let isCorrect = false;
+      const questionType = question.questionType || 'multiple_choice';
+      const userProvidedAnswer = userAnswer !== undefined && userAnswer !== null && userAnswer !== '';
       
-      if (question.questionType === 'multiple_choice' || question.questionType === 'true_false') {
+      if (questionType === 'multiple_choice' || questionType === 'true_false') {
         isCorrect = userAnswer === parsedCorrectAnswer;
-      } else if (question.questionType === 'multiple_select') {
-        // For multiple select, check if arrays match
+      } else if (questionType === 'multiple_select') {
         const userAnswerSet = new Set(Array.isArray(userAnswer) ? userAnswer : []);
         const correctSet = new Set(Array.isArray(parsedCorrectAnswer) ? parsedCorrectAnswer : []);
-        isCorrect = userAnswerSet.size === correctSet.size && 
-                    [...userAnswerSet].every(a => correctSet.has(a));
-      } else if (question.questionType === 'short_answer') {
-        // Case-insensitive comparison for short answers
-        isCorrect = String(userAnswer).toLowerCase().trim() === 
-                    String(parsedCorrectAnswer).toLowerCase().trim();
+        isCorrect = userAnswerSet.size === correctSet.size &&
+          [...userAnswerSet].every((value) => correctSet.has(value));
+      } else if (questionType === 'short_answer') {
+        isCorrect = typeof userAnswer === 'string' &&
+          String(userAnswer).toLowerCase().trim() === String(parsedCorrectAnswer).toLowerCase().trim();
       }
       
+      let pointsForQuestion = 0;
       if (isCorrect) {
-        correctAnswers++;
-        pointsEarned += question.points;
+        correctAnswers += 1;
+        pointsForQuestion = QUIZ_CORRECT_POINTS;
+      } else if (userProvidedAnswer) {
+        pointsForQuestion = -QUIZ_WRONG_PENALTY;
       }
+      pointsEarned += pointsForQuestion;
       
       questionResults.push({
         questionId: question.id,
         userAnswer,
         correctAnswer: quiz.showCorrectAnswers ? parsedCorrectAnswer : undefined,
         isCorrect,
-        points: isCorrect ? question.points : 0,
-        maxPoints: question.points,
+        points: pointsForQuestion,
+        maxPoints: QUIZ_CORRECT_POINTS,
         explanation: quiz.showCorrectAnswers ? question.explanation : undefined,
       });
     }
     
-    // Calculate score percentage
-    const score = quiz.totalPoints > 0 
-      ? Math.round((pointsEarned / quiz.totalPoints) * 100 * 100) / 100
+    // Clamp points to allowed range
+    const adjustedPoints = Math.min(Math.max(pointsEarned, 0), maxPoints);
+    const score = maxPoints > 0
+      ? Math.round(((adjustedPoints / maxPoints) * 100) * 100) / 100
       : 0;
-    
     const passed = score >= quiz.passingScore;
     
     // Update the attempt
+    const now = new Date();
+    const attemptTimeMinutes = timeSpentSeconds ? Math.max(Math.round(timeSpentSeconds / 60), 0) : 0;
+
     await db.update(quizAttempts).set({
       status: 'completed',
       score,
-      pointsEarned,
+      pointsEarned: adjustedPoints,
       correctAnswers,
       passed,
-      answers: JSON.stringify(answers),
+      answers: JSON.stringify(normalizedAnswers),
       questionResults: JSON.stringify(questionResults),
       timeSpentSeconds: timeSpentSeconds || 0,
-      submittedAt: new Date(),
-      gradedAt: new Date(),
+      totalPoints: maxPoints,
+      submittedAt: now,
+      gradedAt: now,
     }).where(eq(quizAttempts.id, attemptId));
     
     // Update module progress if quiz is associated with a module
-    if (quiz.moduleId && passed) {
-      // Check if progress record exists
-      const [existingProgress] = await db
+    if (quiz.moduleId) {
+      const [existingModuleProgress] = await db
         .select()
         .from(userModuleProgress)
         .where(and(
           eq(userModuleProgress.userId, userId),
           eq(userModuleProgress.moduleId, quiz.moduleId)
         ));
-      
-      if (existingProgress) {
-        // Update existing record
+
+      if (existingModuleProgress) {
         await db.update(userModuleProgress).set({
           quizScore: score,
-          quizPassed: true,
-          quizAttempts: (existingProgress.quizAttempts || 0) + 1,
-          isCompleted: true,
-          completedAt: new Date(),
-          status: 'completed',
-          progressPercentage: 100,
-        }).where(eq(userModuleProgress.id, existingProgress.id));
+          quizPassed: passed ? true : existingModuleProgress.quizPassed,
+          quizAttempts: (existingModuleProgress.quizAttempts || 0) + 1,
+          status: passed ? 'completed' : 'in_progress',
+          isCompleted: passed ? true : existingModuleProgress.isCompleted,
+          progressPercentage: passed ? 100 : existingModuleProgress.progressPercentage,
+          completedAt: passed && !existingModuleProgress.completedAt ? now : existingModuleProgress.completedAt,
+          lastAccessedAt: now,
+          isUnlocked: true,
+          timeSpentMinutes: (existingModuleProgress.timeSpentMinutes || 0) + attemptTimeMinutes,
+        }).where(eq(userModuleProgress.id, existingModuleProgress.id));
       } else {
-        // Create new progress record
         const progressId = randomUUID();
         await db.insert(userModuleProgress).values({
           id: progressId,
@@ -644,15 +732,54 @@ router.post('/:quizId/submit', authenticateToken, async (req, res) => {
           courseId: quiz.courseId,
           moduleId: quiz.moduleId,
           enrollmentId: attempt.enrollmentId,
-          status: 'completed',
-          progressPercentage: 100,
+          status: passed ? 'completed' : 'in_progress',
+          progressPercentage: passed ? 100 : 0,
           isUnlocked: true,
-          isCompleted: true,
-          completedAt: new Date(),
-          lastAccessedAt: new Date(),
+          isCompleted: passed,
+          completedAt: passed ? now : null,
+          lastAccessedAt: now,
+          timeSpentMinutes: attemptTimeMinutes,
           quizScore: score,
-          quizPassed: true,
+          quizPassed: passed,
           quizAttempts: 1,
+        });
+      }
+    }
+
+    // Update lesson progress if quiz is linked to a lesson
+    if (quiz.lessonId) {
+      const [existingLessonProgress] = await db
+        .select()
+        .from(userLessonProgress)
+        .where(and(
+          eq(userLessonProgress.userId, userId),
+          eq(userLessonProgress.lessonId, quiz.lessonId)
+        ));
+
+      if (existingLessonProgress) {
+        await db.update(userLessonProgress).set({
+          status: passed ? 'completed' : 'in_progress',
+          progressPercentage: passed ? 100 : existingLessonProgress.progressPercentage,
+          isCompleted: passed ? true : existingLessonProgress.isCompleted,
+          completedAt: passed && !existingLessonProgress.completedAt ? now : existingLessonProgress.completedAt,
+          lastAccessedAt: now,
+          timeSpentMinutes: (existingLessonProgress.timeSpentMinutes || 0) + attemptTimeMinutes,
+        }).where(eq(userLessonProgress.id, existingLessonProgress.id));
+      } else {
+        const lessonProgressId = randomUUID();
+        await db.insert(userLessonProgress).values({
+          id: lessonProgressId,
+          userId,
+          moduleId: quiz.moduleId,
+          lessonId: quiz.lessonId,
+          enrollmentId: attempt.enrollmentId,
+          status: passed ? 'completed' : 'in_progress',
+          progressPercentage: passed ? 100 : 0,
+          isCompleted: passed,
+          completedAt: passed ? now : null,
+          lastAccessedAt: now,
+          lastPosition: 0,
+          timeSpentMinutes: attemptTimeMinutes,
         });
       }
     }
@@ -669,8 +796,8 @@ router.post('/:quizId/submit', authenticateToken, async (req, res) => {
       score,
       correctAnswers,
       totalQuestions: questions.length,
-      pointsEarned,
-      totalPoints: quiz.totalPoints,
+      pointsEarned: adjustedPoints,
+      totalPoints: maxPoints,
     });
   } catch (error) {
     console.error('Error submitting quiz:', error);

@@ -7,7 +7,7 @@ export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '')
   const pid = env.VITE_FIREBASE_PROJECT_ID
   const functionsProxyTarget = env.VITE_FUNCTIONS_PROXY_TARGET || (pid ? `https://us-central1-${pid}.cloudfunctions.net` : undefined)
-  const backendProxyTarget = env.VITE_DEV_BACKEND_TARGET || env.VITE_BACKEND_URL || 'http://localhost:8001'
+  const backendProxyTarget = env.VITE_DEV_BACKEND_TARGET || env.VITE_BACKEND_URL || 'http://localhost:3000'
 
   const proxy = {}
 
@@ -30,7 +30,7 @@ export default defineConfig(({ mode }) => {
     plugins: [react(), tailwindcss()],
     server: {
       host: '0.0.0.0',
-      port: 3000,
+      port: 5173,
       proxy,
       allowedHosts: ['a169b887-422a-4075-b61e-0bdf6c0500ed.preview.emergentagent.com', '.preview.emergentagent.com'],
     },
@@ -58,9 +58,9 @@ export default defineConfig(({ mode }) => {
           }
         }
       },
-  // Increase Vite's chunk size warning limit to avoid noisy warnings for
-  // larger vendor/admin bundles. Set to 2000 KB (2 MB).
-  chunkSizeWarningLimit: 2000,
+      // Increase Vite's chunk size warning limit to avoid noisy warnings for
+      // larger vendor/admin bundles. Set to 2000 KB (2 MB).
+      chunkSizeWarningLimit: 2000,
     }
   }
 })

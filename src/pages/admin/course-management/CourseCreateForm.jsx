@@ -1,7 +1,7 @@
 /* eslint-disable no-console */
 /* eslint-disable no-unused-vars */
 import React, { useState, useMemo } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Navigate } from "react-router-dom";
 import { useAuth } from "../../../contexts/AuthContext.jsx";
 import { useCourseContext } from "../../../contexts/CourseContext.jsx";
 import {
@@ -73,7 +73,7 @@ const extractNestedMessage = (value) => {
 };
 
 const CourseCreateForm = () => {
-  const { isAdmin, currentUser } = useAuth();
+  const { isAdmin, currentUser, loading: authLoading } = useAuth();
   const { createCourse } = useCourseContext();
   const navigate = useNavigate();
 
@@ -389,6 +389,14 @@ const CourseCreateForm = () => {
   };
 
   // 🚫 Access Control
+  if (authLoading || isAdmin === null || isAdmin === undefined) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-gray-50">
+        <LoadingSpinner size="lg" aria-label="Checking admin access" />
+      </div>
+    );
+  }
+
   if (!isAdmin) {
     return <Navigate to="/" replace />;
   }

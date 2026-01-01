@@ -1,8 +1,9 @@
+/* eslint-disable no-unused-vars */
 /* eslint-disable no-console */
 import { Router } from 'express';
 import { randomUUID } from 'crypto';
 import { db } from '../db/index.js';
-import { courses } from '../db/schema.js';
+import { courses, courseModules, moduleLessons, quizzes, quizQuestions } from '../db/schema.js';
 import { and, eq, ilike, desc } from 'drizzle-orm';
 import { authenticateToken, requireAdmin } from '../middleware/auth.js';
 import { validateBody, validateUUID } from '../middleware/validation.middleware.js';
@@ -12,9 +13,13 @@ const router = Router();
 
 const ensureArray = (value) => (Array.isArray(value) ? value : []);
 
+const DEFAULT_QUIZ_POINTS = 5;
+
 const compactObject = (obj) => Object.fromEntries(
   Object.entries(obj).filter(([, value]) => value !== undefined)
 );
+
+const isUuid = (value) => typeof value === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
 
 const toTrimmedString = (value) => {
   if (value === null || value === undefined) return '';
@@ -47,7 +52,8 @@ const sanitizeResources = (resources) =>
       }
 
       const sanitized = { ...resource };
-      sanitized.id = toTrimmedString(sanitized.id) || randomUUID();
+      const resourceId = toTrimmedString(sanitized.id);
+      sanitized.id = isUuid(resourceId) ? resourceId : randomUUID();
       sanitized.type = toTrimmedString(sanitized.type) || 'document';
       if (sanitized.title !== undefined) {
         sanitized.title = toTrimmedString(sanitized.title) || null;
@@ -64,6 +70,85 @@ const sanitizeResources = (resources) =>
       return compactObject(sanitized);
     })
     .filter(Boolean);
+
+const toPositiveIntegerOrNull = (value) => {
+  if (value === null || value === undefined || value === '') {
+    return null;
+  }
+  const numericValue = Number.parseInt(value, 10);
+  return Number.isFinite(numericValue) && numericValue >= 0 ? numericValue : null;
+};
+
+const sanitizeQuizQuestions = (questions) =>
+  ensureArray(questions)
+    .map((question, index) => {
+      if (!question || typeof question !== 'object') {
+        return null;
+      }
+
+      const sanitized = { ...question };
+      const questionId = toTrimmedString(sanitized.id);
+      sanitized.id = isUuid(questionId) ? questionId : randomUUID();
+      sanitized.questionText = sanitized.questionText !== undefined ? toTrimmedString(sanitized.questionText) || '' : '';
+
+      const rawOptions = ensureArray(sanitized.options).map((option, optionIndex) => {
+        const value = toTrimmedString(option);
+        return value || `Option ${optionIndex + 1}`;
+      });
+      sanitized.options = rawOptions.length >= 2 ? rawOptions : [...rawOptions, `Option ${rawOptions.length + 1 || 1}`];
+
+      const correctIndex = Number.isFinite(Number(sanitized.correctOptionIndex))
+        ? Number(sanitized.correctOptionIndex)
+        : 0;
+      const boundedIndex = Math.min(Math.max(correctIndex, 0), sanitized.options.length - 1);
+      sanitized.correctOptionIndex = boundedIndex;
+      sanitized.correctAnswer = sanitized.options[boundedIndex];
+
+      if (sanitized.explanation !== undefined) {
+        sanitized.explanation = toTrimmedString(sanitized.explanation) || null;
+      }
+
+      const parsedPoints = Number.parseInt(sanitized.points, 10);
+      sanitized.points = Number.isFinite(parsedPoints) && parsedPoints > 0 ? parsedPoints : DEFAULT_QUIZ_POINTS;
+      sanitized.orderIndex = index + 1;
+
+      return compactObject(sanitized);
+    })
+    .filter(Boolean);
+
+const sanitizeQuiz = (quiz, lesson, lessonIndex) => {
+  if (!quiz || typeof quiz !== 'object') {
+    return null;
+  }
+
+  const sanitized = { ...quiz };
+  const quizId = toTrimmedString(sanitized.id);
+  sanitized.id = isUuid(quizId) ? quizId : randomUUID();
+  sanitized.title = sanitized.title !== undefined ? toTrimmedString(sanitized.title) || `${lesson?.title || 'Lesson'} Quiz` : `${lesson?.title || 'Lesson'} Quiz`;
+  if (sanitized.description !== undefined) {
+    sanitized.description = toTrimmedString(sanitized.description) || null;
+  }
+
+  const passingScoreNumeric = Number.parseInt(sanitized.passingScore, 10);
+  sanitized.passingScore = Number.isFinite(passingScoreNumeric)
+    ? Math.min(Math.max(passingScoreNumeric, 0), 100)
+    : 70;
+  sanitized.timeLimit = toPositiveIntegerOrNull(sanitized.timeLimit);
+  sanitized.maxAttempts = toPositiveIntegerOrNull(sanitized.maxAttempts);
+  sanitized.shuffleQuestions = Boolean(sanitized.shuffleQuestions);
+  sanitized.shuffleOptions = Boolean(sanitized.shuffleOptions);
+  sanitized.showCorrectAnswers = sanitized.showCorrectAnswers === true;
+  sanitized.showScore = sanitized.showScore !== false;
+  sanitized.isRequired = sanitized.isRequired !== false;
+  sanitized.isPublished = sanitized.isPublished !== false;
+
+  sanitized.questions = sanitizeQuizQuestions(sanitized.questions);
+  sanitized.totalQuestions = sanitized.questions.length;
+  sanitized.totalPoints = sanitized.questions.length * DEFAULT_QUIZ_POINTS;
+  sanitized.orderIndex = lessonIndex + 1;
+
+  return compactObject(sanitized);
+};
 
 const sanitizeDurationValue = (value) => {
   if (value === null || value === undefined || value === '') {
@@ -103,7 +188,8 @@ const sanitizeLessons = (lessons) =>
       }
 
       const sanitized = { ...lesson };
-      sanitized.id = toTrimmedString(sanitized.id) || randomUUID();
+      const lessonId = toTrimmedString(sanitized.id);
+      sanitized.id = isUuid(lessonId) ? lessonId : randomUUID();
       sanitized.title = sanitized.title !== undefined ? toTrimmedString(sanitized.title) || '' : '';
       if (sanitized.summary !== undefined) {
         sanitized.summary = toTrimmedString(sanitized.summary) || null;
@@ -125,6 +211,7 @@ const sanitizeLessons = (lessons) =>
       const order = coerceInt(sanitized.order, index + 1);
       sanitized.order = order > 0 ? order : index + 1;
       sanitized.resources = sanitizeResources(sanitized.resources);
+      sanitized.quiz = sanitizeQuiz(lesson.quiz ?? sanitized.quiz, lesson, index);
 
       return compactObject(sanitized);
     })
@@ -138,7 +225,8 @@ const sanitizeModules = (modules) =>
       }
 
       const sanitized = { ...module };
-      sanitized.id = toTrimmedString(sanitized.id) || randomUUID();
+      const moduleId = toTrimmedString(sanitized.id);
+      sanitized.id = isUuid(moduleId) ? moduleId : randomUUID();
       sanitized.title = sanitized.title !== undefined ? toTrimmedString(sanitized.title) || '' : '';
       if (sanitized.description !== undefined) {
         sanitized.description = toTrimmedString(sanitized.description) || null;
@@ -171,6 +259,127 @@ const coerceNumber = (value, fallback = 0) => {
   if (value === null || value === undefined || value === '') return fallback;
   const numericValue = Number(value);
   return Number.isFinite(numericValue) ? numericValue : fallback;
+};
+
+const syncCourseStructure = async (courseId, modulesData = [], { replaceExisting = false } = {}) => {
+  if (!Array.isArray(modulesData) || modulesData.length === 0) {
+    return;
+  }
+
+  await db.transaction(async (tx) => {
+    if (replaceExisting) {
+      await tx.delete(courseModules).where(eq(courseModules.courseId, courseId));
+    }
+
+    for (let moduleIndex = 0; moduleIndex < modulesData.length; moduleIndex += 1) {
+      const moduleData = modulesData[moduleIndex] || {};
+      const moduleId = isUuid(moduleData.id) ? moduleData.id : randomUUID();
+
+      await tx.insert(courseModules).values({
+        id: moduleId,
+        courseId,
+        title: moduleData.title || '',
+        description: moduleData.description || null,
+        summary: moduleData.summary || null,
+        orderIndex: coerceInt(moduleData.order, moduleIndex + 1),
+        duration: coerceInt(moduleData.duration, 0),
+        contentType: toTrimmedString(moduleData.contentType) || 'video',
+        contentUrl: toTrimmedString(moduleData.contentUrl ?? moduleData.content) || null,
+        contentData: moduleData.contentData ? JSON.stringify(moduleData.contentData) : null,
+        isFreePreview: Boolean(moduleData.isFreePreview),
+        isPublished: moduleData.isPublished !== false,
+        requiresPreviousCompletion: moduleData.requiresPreviousCompletion !== false,
+        passingScore: coerceInt(moduleData.passingScore ?? moduleData?.quiz?.passingScore, 70),
+        resources: JSON.stringify(moduleData.resources || []),
+      });
+
+      const lessons = Array.isArray(moduleData.lessons) ? moduleData.lessons : [];
+      for (let lessonIndex = 0; lessonIndex < lessons.length; lessonIndex += 1) {
+        const lessonData = lessons[lessonIndex] || {};
+        const lessonId = isUuid(lessonData.id) ? lessonData.id : randomUUID();
+
+        const resourcesPayload = Array.isArray(lessonData.resources) && lessonData.resources.length > 0
+          ? { resources: lessonData.resources }
+          : null;
+        const serializedContentData = lessonData.contentData
+          ? JSON.stringify(lessonData.contentData)
+          : resourcesPayload
+            ? JSON.stringify(resourcesPayload)
+            : null;
+
+        await tx.insert(moduleLessons).values({
+          id: lessonId,
+          moduleId,
+          title: lessonData.title || '',
+          description: lessonData.description || null,
+          orderIndex: coerceInt(lessonData.order, lessonIndex + 1),
+          duration: coerceInt(lessonData.duration, 0),
+          contentType: toTrimmedString(lessonData.type) || 'video',
+          contentUrl: toTrimmedString(lessonData.content) || null,
+          contentData: serializedContentData,
+          isFreePreview: Boolean(lessonData.isFreePreview),
+          isPublished: lessonData.isPublished !== false,
+        });
+
+        const quizData = lessonData.quiz;
+        const questions = Array.isArray(quizData?.questions) ? quizData.questions : [];
+        if (quizData && questions.length > 0) {
+          const quizId = isUuid(quizData.id) ? quizData.id : randomUUID();
+          const totalPoints = questions.length * DEFAULT_QUIZ_POINTS;
+
+          await tx.insert(quizzes).values({
+            id: quizId,
+            courseId,
+            moduleId,
+            lessonId,
+            title: quizData.title || `${lessonData.title || 'Lesson'} Quiz`,
+            description: quizData.description || null,
+            instructions: quizData.instructions || null,
+            passingScore: coerceInt(quizData.passingScore, 70),
+            timeLimit: toPositiveIntegerOrNull(quizData.timeLimit),
+            maxAttempts: toPositiveIntegerOrNull(quizData.maxAttempts),
+            shuffleQuestions: Boolean(quizData.shuffleQuestions),
+            shuffleOptions: Boolean(quizData.shuffleOptions),
+            showCorrectAnswers: quizData.showCorrectAnswers === true,
+            showScore: quizData.showScore !== false,
+            isRequired: quizData.isRequired !== false,
+            isPublished: quizData.isPublished !== false,
+            orderIndex: coerceInt(quizData.orderIndex, lessonIndex + 1),
+            totalQuestions: questions.length,
+            totalPoints,
+          });
+
+          for (let questionIndex = 0; questionIndex < questions.length; questionIndex += 1) {
+            const questionData = questions[questionIndex] || {};
+            const questionId = isUuid(questionData.id) ? questionData.id : randomUUID();
+            const options = ensureArray(questionData.options);
+            const correctIndex = Number.isFinite(Number(questionData.correctOptionIndex))
+              ? Number(questionData.correctOptionIndex)
+              : options.findIndex((option) => option === questionData.correctAnswer);
+            const boundedIndex = correctIndex >= 0 && correctIndex < options.length ? correctIndex : 0;
+            const correctAnswer = typeof questionData.correctAnswer === 'string'
+              ? questionData.correctAnswer
+              : options[boundedIndex];
+
+            await tx.insert(quizQuestions).values({
+              id: questionId,
+              quizId,
+              questionText: questionData.questionText || '',
+              questionType: toTrimmedString(questionData.questionType) || 'multiple_choice',
+              options: JSON.stringify(options),
+              correctAnswer: correctAnswer || '',
+              explanation: questionData.explanation || null,
+              points: coerceInt(questionData.points, DEFAULT_QUIZ_POINTS),
+              orderIndex: coerceInt(questionData.orderIndex, questionIndex + 1),
+              difficulty: toTrimmedString(questionData.difficulty) || 'medium',
+              tags: JSON.stringify(questionData.tags || []),
+              isActive: questionData.isActive !== false,
+            });
+          }
+        }
+      }
+    }
+  });
 };
 
 const normalizeCourseInput = (input = {}, { isNew = false, userId } = {}) => {
@@ -517,6 +726,10 @@ router.post('/', authenticateToken, requireAdmin, async (req, res) => {
       ...normalizedInput,
     }).execute();
 
+    if (Array.isArray(normalizedInput.modules) && normalizedInput.modules.length > 0) {
+      await syncCourseStructure(courseId, normalizedInput.modules, { replaceExisting: true });
+    }
+
     const [newCourse] = await db.select().from(courses).where(eq(courses.id, courseId)).limit(1);
     res.status(201).json({
       message: 'Course created successfully',
@@ -553,6 +766,10 @@ router.put('/:id', authenticateToken, requireAdmin, async (req, res) => {
       .set(normalizedUpdates)
       .where(eq(courses.id, req.params.id))
       .execute();
+
+    if (Array.isArray(normalizedUpdates.modules) && normalizedUpdates.modules.length > 0) {
+      await syncCourseStructure(req.params.id, normalizedUpdates.modules, { replaceExisting: true });
+    }
 
     const [updatedCourse] = await db.select().from(courses).where(eq(courses.id, req.params.id)).limit(1);
 

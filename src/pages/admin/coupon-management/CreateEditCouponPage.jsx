@@ -2,19 +2,20 @@
 // src/pages/admin/CreateEditCouponPage.jsx
 
 import { useEffect } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, Navigate } from "react-router-dom";
 import { useAuth } from "../../../contexts/AuthContext.jsx";
 import { useCouponLogic } from "../../../hooks/useCouponLogic.js";
 import PageContainer from "../../../components/layout/PageContainer.jsx";
 import { AlertCircle, Percent, IndianRupee, ArrowLeft } from "lucide-react";
 
 import PageTitle from "../../../components/ui/PageTitle.jsx";
+import LoadingSpinner from "../../../components/ui/LoadingSpinner.jsx";
 
 const PRIMARY_COLOR = "var(--color-primary)"; // LinkedIn Blue from theme
 
 const CreateEditCouponPage = () => {
   // ... existing hook and auth logic (omitted for brevity)
-  const { isAdmin } = useAuth();
+  const { isAdmin, loading: authLoading } = useAuth();
   const { couponId } = useParams(); // ID is correctly pulled from URL
   const navigate = useNavigate();
 
@@ -56,6 +57,18 @@ const CreateEditCouponPage = () => {
   ];
 
  
+  if (authLoading || isAdmin === null || isAdmin === undefined) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-gray-50">
+        <LoadingSpinner size="lg" aria-label="Checking admin access" />
+      </div>
+    );
+  }
+
+  if (!isAdmin) {
+    return <Navigate to="/" replace />;
+  }
+
   return (
     // ... full component JSX
     <PageContainer

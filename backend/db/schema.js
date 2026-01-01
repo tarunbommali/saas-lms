@@ -271,6 +271,8 @@ export const quizzes = mysqlTable('quizzes', {
     .references(() => courses.id, { onDelete: 'cascade' }),
   moduleId: varchar('module_id', 36)
     .references(() => courseModules.id, { onDelete: 'cascade' }), // Optional: quiz can be course-level or module-level
+  lessonId: varchar('lesson_id', 36)
+    .references(() => moduleLessons.id, { onDelete: 'cascade' }),
   title: varchar('title', 255).notNull(),
   description: text('description'),
   instructions: text('instructions'),
@@ -321,6 +323,8 @@ export const quizAttempts = mysqlTable('quiz_attempts', {
   userId: varchar('user_id', 36)
     .notNull()
     .references(() => users.id, { onDelete: 'cascade' }),
+  lessonId: varchar('lesson_id', 36)
+    .references(() => moduleLessons.id, { onDelete: 'set null' }),
   enrollmentId: varchar('enrollment_id', 36)
     .references(() => enrollments.id, { onDelete: 'set null' }),
   attemptNumber: int('attempt_number').notNull().default(1),

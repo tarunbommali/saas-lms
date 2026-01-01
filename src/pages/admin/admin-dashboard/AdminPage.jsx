@@ -8,6 +8,7 @@ import { Navigate, Link } from "react-router-dom";
 import { global_classnames } from "../../../utils/classnames.js";
 import PageContainer from "../../../components/layout/PageContainer.jsx";
 import PageTitle from "../../../components/ui/PageTitle.jsx";
+import LoadingSpinner from "../../../components/ui/LoadingSpinner.jsx";
 import {
   Users,
   BookOpen,
@@ -22,16 +23,26 @@ import { formatINR } from "../../../utils/currency.js";
 
 const items = [{ label: "Admin", link: "/admin" }];
 const AdminPage = () => {
-  const { isAdmin, userProfile } = useAuth();
+  const { isAdmin, userProfile, loading: authLoading } = useAuth();
+
+  if (authLoading || isAdmin === null || isAdmin === undefined) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-gray-50">
+        <LoadingSpinner size="lg" aria-label="Checking admin access" />
+      </div>
+    );
+  }
 
   if (!isAdmin) {
     return <Navigate to="/" replace />;
   }
 
+  const enabledAdminRealtime = isAdmin && !authLoading;
+
   // Realtime data
-  const { data: users = [], loading: usersLoading } = useRealtimeAdminUsers({ enabled: true });
-  const { data: enrollments = [], loading: enrollmentsLoading } = useRealtimeAdminEnrollments({ enabled: true });
-  const { data: payments = [], loading: paymentsLoading } = useRealtimeAdminPayments({ enabled: true });
+  const { data: users = [], loading: usersLoading } = useRealtimeAdminUsers({ enabled: enabledAdminRealtime });
+  const { data: enrollments = [], loading: enrollmentsLoading } = useRealtimeAdminEnrollments({ enabled: enabledAdminRealtime });
+  const { data: payments = [], loading: paymentsLoading } = useRealtimeAdminPayments({ enabled: enabledAdminRealtime });
   const { data: courses = [], loading: coursesLoading } = useRealtimeCourses({ publishedOnly: true, featuredOnly: false, limitCount: 200 });
 
   // Derived stats (resilient to missing fields)

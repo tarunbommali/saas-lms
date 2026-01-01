@@ -14,7 +14,8 @@ const SignUp = () => {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
-  const { signup, signinWithGoogle, currentUser } = useAuth();
+  const { signup, signinWithGoogle, currentUser, logout } = useAuth();
+  const [logoutLoading, setLogoutLoading] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -64,8 +65,17 @@ const SignUp = () => {
     setGoogleLoading(false);
   };
 
-  // Redirect authenticated users away from the signup page
-  if (currentUser) return <Navigate to="/" replace />;
+  const handleLogout = async () => {
+    setLogoutLoading(true);
+    try {
+      await logout();
+      // After logout, the page will re-render and currentUser will be null, showing the form
+    } catch (error) {
+      console.error("Logout failed", error);
+    }
+    setLogoutLoading(false);
+  };
+
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4 py-12">

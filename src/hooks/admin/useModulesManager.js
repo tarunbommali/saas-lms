@@ -31,6 +31,7 @@ const createNewLesson = (module) => {
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
     resources: [],
+    quiz: null,
   };
 };
 

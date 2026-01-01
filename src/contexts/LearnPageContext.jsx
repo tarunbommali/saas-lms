@@ -162,11 +162,15 @@ export const LearnPageProvider = ({ children }) => {
                 });
                 const videos = itemsSorted.map((v, vIdx) => ({
                     id: v.videoId || v.id || `V${vIdx + 1}`,
+                    lessonId: v.id || v.videoId || `lesson-${vIdx + 1}`,
+                    moduleId: m.moduleKey || m.id || `M${idx + 1}`,
                     title: v.title || `Video ${vIdx + 1}`,
+                    type: v.type || 'video',
                     // Map content (from Admin form) to url; fallback to url/videoKey
                     url: v.content || v.url || v.videoKey || '',
                     duration: v.duration || v.duration_min || undefined,
                     resources: Array.isArray(v.resources) ? v.resources : undefined,
+                    quiz: v.quiz || null,
                 }));
                 return {
                     id: m.moduleKey || m.id || `M${idx + 1}`,

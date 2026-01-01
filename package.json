@@ -12,7 +12,10 @@
     "preview": "vite preview",
     "backend": "node ./backend/server.js",
     "create:admin": "node scripts/create-admin.mjs",
-    "grant:admin": "node scripts/grant-admin.mjs"
+    "grant:admin": "node scripts/grant-admin.mjs",
+    "check:db": "node scripts/check-db.mjs",
+    "test:api": "node scripts/test-api.mjs",
+    "init:db": "node scripts/init-db.mjs"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.1.13",

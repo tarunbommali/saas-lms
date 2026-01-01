@@ -100,6 +100,7 @@ app.use("/api/admin/enrollments", enrollmentsRoutes);
 app.use("/api/admin/payments", paymentsRoutes);
 app.use("/api/admin/coupons", couponsRoutes);
 app.use("/api/admin/certifications", certificationsRoutes);
+app.use("/api/certifications", certificationsRoutes);
 app.use('/api/admin/realtime', adminRealtimeRoutes);
 app.use('/api/public/realtime', publicRealtimeRoutes);
 app.use('/api/progress', progressRoutes);

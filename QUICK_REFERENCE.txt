@@ -1,0 +1,77 @@
+╔══════════════════════════════════════════════════════════════════╗
+║                  🎯 QUICK REFERENCE CARD                         ║
+╚══════════════════════════════════════════════════════════════════╝
+
+📌 CURRENT CONFIGURATION
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  Frontend (Vite):     http://localhost:5173
+  Backend (Express):   http://localhost:3000
+  Database (MySQL):    localhost:3306 → jntugv_certification
+  
+  ✅ All systems connected and operational!
+
+🚀 ESSENTIAL COMMANDS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  Start Development:
+    npm run dev              # Starts both frontend + backend
+    
+  Start Separately:
+    npm run dev:frontend     # Frontend only (port 5173)
+    npm run dev:backend      # Backend only (port 3000)
+
+🔍 DIAGNOSTIC COMMANDS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  npm run init:db          # Initialize/reset database (⚠️ DESTRUCTIVE)
+  npm run check:db         # Check database connection & tables
+  npm run test:api         # Test API endpoints
+  
+  Manual Tests:
+    curl http://localhost:3000/api/health
+    curl http://localhost:3000/api/courses
+
+📊 DATABASE INFO
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  Database:  jntugv_certification
+  Tables:    13 (all initialized)
+  Users:     1 admin user
+  Courses:   0 (ready to create)
+
+🛠️ ADMIN ACCESS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  Email:     (from .env ADMIN_EMAIL)
+  Password:  (from .env ADMIN_PASSWORD)
+  
+  Create more admins:
+    npm run create:admin
+    npm run grant:admin
+
+📁 KEY FILES
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  .env                     # Database & admin credentials
+  vite.config.js           # Frontend port & proxy config
+  backend/server.js        # Backend port & routes
+  backend/db/index.js      # Database connection & schema
+  CONNECTION_FIX.md        # Full documentation
+
+⚠️ TROUBLESHOOTING
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  ECONNREFUSED errors?
+    1. Check backend is running: npm run test:api
+    2. Check database: npm run check:db
+    3. Restart: Ctrl+C, then npm run dev
+    
+  Port already in use?
+    - Frontend uses 5173 (not 3000 anymore)
+    - Backend uses 3000
+    - Kill conflicting processes if needed
+
+✨ NEXT STEPS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  1. Restart dev server: npm run dev
+  2. Open browser: http://localhost:5173
+  3. Login as admin
+  4. Create your first course!
+
+╔══════════════════════════════════════════════════════════════════╗
+║  Need help? Check CONNECTION_FIX.md for detailed documentation   ║
+╚══════════════════════════════════════════════════════════════════╝

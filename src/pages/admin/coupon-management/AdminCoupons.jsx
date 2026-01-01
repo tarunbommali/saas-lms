@@ -4,7 +4,7 @@
 
 import { useState } from "react";
 import { useAuth } from "../../../contexts/AuthContext.jsx";
-import { useNavigate, Link } from "react-router-dom"; // Import useNavigate and Link
+import { useNavigate, Link, Navigate } from "react-router-dom"; // Import useNavigate and Link
 import { useCouponLogic } from "../../../hooks/useCouponLogic.js";
 import {
   Plus,
@@ -18,6 +18,7 @@ import {
 import * as LucideIcons from "lucide-react";
 import PageContainer from "../../../components/layout/PageContainer.jsx";
 import PageTitle from "../../../components/ui/PageTitle.jsx";
+import LoadingSpinner from "../../../components/ui/LoadingSpinner.jsx";
 import { formatINR } from "../../../utils/currency.js";
 const PRIMARY_COLOR = "var(--color-primary)"; // LinkedIn Blue from theme
 
@@ -27,7 +28,7 @@ const items = [
 ];
 
 const AdminCoupons = () => {
-  const { isAdmin } = useAuth();
+  const { isAdmin, loading: authLoading } = useAuth();
   const navigate = useNavigate(); // Initialize useNavigate
 
   const { coupons, loading, error, handleDelete, formatDate, getCouponStatus } =
@@ -102,6 +103,18 @@ const AdminCoupons = () => {
     // Correct path for editing a coupon: /admin/coupons/edit/:couponId
     navigate(`/admin/coupons/edit/${couponId}`);
   };
+
+  if (authLoading || isAdmin === null || isAdmin === undefined) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-gray-50">
+        <LoadingSpinner size="lg" aria-label="Checking admin access" />
+      </div>
+    );
+  }
+
+  if (!isAdmin) {
+    return <Navigate to="/" replace />;
+  }
 
   return (
     <PageContainer items={items} className="min-h-screen bg-gray-50 py-8">

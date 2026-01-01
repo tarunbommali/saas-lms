@@ -76,7 +76,7 @@ const extractNestedMessage = (value) => {
 };
 
 const CourseEditForm = () => {
-  const { isAdmin, currentUser } = useAuth();
+  const { isAdmin, currentUser, loading: authLoading } = useAuth();
   const { updateCourse, getCourseById } = useCourseContext();
   const { courseId } = useParams();
   const navigate = useNavigate();
@@ -202,6 +202,10 @@ const CourseEditForm = () => {
   // ✅ Data fetch effect for editing
   useEffect(() => {
     const fetchCourseData = async () => {
+      if (authLoading || isAdmin === null || isAdmin === undefined) {
+        return;
+      }
+
       if (!isAdmin) {
         setLoading(false);
         return;
@@ -235,7 +239,7 @@ const CourseEditForm = () => {
     };
 
     fetchCourseData();
-  }, [isAdmin, actualCourseId, currentUser, getCourseById]);
+  }, [authLoading, isAdmin, actualCourseId, currentUser, getCourseById]);
 
   const handleValidationFailure = (validationErrors) => {
     const firstErrorField = getFirstErrorField(validationErrors) || Object.keys(validationErrors || {})[0];
@@ -425,6 +429,14 @@ const CourseEditForm = () => {
   };
 
   // 🚫 Access Control
+  if (authLoading || isAdmin === null || isAdmin === undefined) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-gray-50">
+        <LoadingSpinner size="lg" aria-label="Checking admin access" />
+      </div>
+    );
+  }
+
   if (!isAdmin) return <Navigate to="/" replace />;
 
   // ⏳ Loading State

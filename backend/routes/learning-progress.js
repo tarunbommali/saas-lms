@@ -89,6 +89,18 @@ router.get('/:courseId', authenticateToken, async (req, res) => {
         .select()
         .from(quizzes)
         .where(eq(quizzes.moduleId, module.id));
+
+      const lessonQuizMap = new Map();
+      const moduleLevelQuizzes = [];
+      for (const quiz of moduleQuizzes) {
+        if (quiz.lessonId) {
+          const existing = lessonQuizMap.get(quiz.lessonId) || [];
+          existing.push(quiz);
+          lessonQuizMap.set(quiz.lessonId, existing);
+        } else {
+          moduleLevelQuizzes.push(quiz);
+        }
+      }
       
       // Determine if module is unlocked
       let isUnlocked = index === 0; // First module is always unlocked
@@ -146,13 +158,14 @@ router.get('/:courseId', authenticateToken, async (req, res) => {
         },
         lessons: lessons.map(lesson => ({
           ...lesson,
+          quiz: (lessonQuizMap.get(lesson.id) || [])[0] || null,
           progress: lessonProgressMap.get(lesson.id) || {
             status: 'not_started',
             progressPercentage: 0,
             isCompleted: false,
           },
         })),
-        quizzes: moduleQuizzes,
+        quizzes: moduleLevelQuizzes,
       };
     }));
     

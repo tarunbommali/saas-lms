@@ -7,8 +7,11 @@ const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID?.trim();
 const ensureUserShape = (user) => {
   if (!user) return null;
   const normalized = authApi.normalizeUser(user);
+  const isAdmin = Boolean(normalized.isAdmin);
   return {
     ...normalized,
+    isAdmin,
+    role: normalized.role || (isAdmin ? 'admin' : 'student'),
     email: normalized.email || '',
     displayName: normalized.displayName || normalized.firstName || '',
   };
@@ -68,6 +71,7 @@ export const AuthProvider = ({ children }) => {
       setCurrentUser(null);
       setUserProfile(null);
     }
+    setLoading(false);
     return normalizedUser;
   }, []);
 
@@ -90,11 +94,13 @@ export const AuthProvider = ({ children }) => {
 
   const signup = useCallback(async (email, password, additionalData = {}) => {
     const result = await authApi.signup({ email, password, ...additionalData });
+    setLoading(false);
     return applySession(result);
   }, [applySession]);
 
   const signin = useCallback(async (email, password) => {
     const result = await authApi.login({ email, password });
+    setLoading(false);
     return applySession(result);
   }, [applySession]);
 
@@ -244,6 +250,7 @@ export const AuthProvider = ({ children }) => {
     authApi.logoutSession();
     setCurrentUser(null);
     setUserProfile(null);
+    setLoading(false);
 
     // Revoke Google session if available
     if (window.google?.accounts?.id) {
@@ -265,10 +272,19 @@ export const AuthProvider = ({ children }) => {
     return applySession(result);
   }, [applySession]);
 
+  const isAdmin = useMemo(() => {
+    if (loading) return null;
+    return currentUser ? Boolean(currentUser.isAdmin) : false;
+  }, [currentUser, loading]);
+
+  const isAuthenticated = useMemo(() => Boolean(currentUser?.id || currentUser?.uid), [currentUser]);
+
   const value = useMemo(() => ({
     currentUser,
     userProfile,
     loading,
+    isAuthenticated,
+    isAdmin,
     signup,
     signin,
     signinWithGoogle,
@@ -283,6 +299,8 @@ export const AuthProvider = ({ children }) => {
     currentUser,
     userProfile,
     loading,
+    isAuthenticated,
+    isAdmin,
     signup,
     signin,
     signinWithGoogle,

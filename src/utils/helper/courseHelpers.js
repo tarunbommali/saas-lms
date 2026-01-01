@@ -1,4 +1,5 @@
 const COURSE_IMAGE_PLACEHOLDER = "https://developers.elementor.com/docs/assets/img/elementor-placeholder-image.png";
+const DEFAULT_QUIZ_POINTS = 5;
 
 const ensureArray = (value) => (Array.isArray(value) ? value : []);
 
@@ -54,6 +55,79 @@ const sanitizeResourcesForSave = (resources) =>
     })
     .filter(Boolean);
 
+const toPositiveIntegerOrNull = (value) => {
+  if (value === "" || value === null || value === undefined) {
+    return null;
+  }
+  const numeric = Number.parseInt(value, 10);
+  return Number.isFinite(numeric) && numeric >= 0 ? numeric : null;
+};
+
+const sanitizeQuizQuestionsForSave = (questions) =>
+  ensureArray(questions)
+    .map((question, index) => {
+      if (!question || typeof question !== "object") {
+        return null;
+      }
+
+      const sanitized = { ...question };
+      sanitized.id = toTrimmedString(sanitized.id) || `question-${Date.now()}-${index}`;
+      sanitized.questionText = toTrimmedString(sanitized.questionText) || "";
+
+      const rawOptions = ensureArray(sanitized.options).map((option, optionIndex) => {
+        const value = toTrimmedString(option);
+        return value || `Option ${optionIndex + 1}`;
+      });
+      const options = rawOptions.length >= 2 ? rawOptions : [...rawOptions, `Option ${rawOptions.length + 1 || 1}`];
+      sanitized.options = options;
+
+      const fallbackCorrectIndex = Number.isFinite(Number(sanitized.correctOptionIndex))
+        ? Number(sanitized.correctOptionIndex)
+        : 0;
+      const boundedCorrectIndex = Math.min(Math.max(fallbackCorrectIndex, 0), options.length - 1);
+      sanitized.correctOptionIndex = boundedCorrectIndex;
+      sanitized.correctAnswer = options[boundedCorrectIndex];
+
+      if (sanitized.explanation !== undefined) {
+        sanitized.explanation = toTrimmedString(sanitized.explanation) || null;
+      }
+
+      const parsedPoints = Number.parseInt(sanitized.points, 10);
+      sanitized.points = Number.isFinite(parsedPoints) && parsedPoints > 0 ? parsedPoints : DEFAULT_QUIZ_POINTS;
+      sanitized.orderIndex = index + 1;
+
+      return compactObject(sanitized);
+    })
+    .filter(Boolean);
+
+const sanitizeQuizForSave = (quiz, lesson, lessonIndex) => {
+  if (!quiz || typeof quiz !== "object") {
+    return null;
+  }
+
+  const sanitized = { ...quiz };
+  sanitized.id = toTrimmedString(sanitized.id) || `quiz-${Date.now()}-${lessonIndex}`;
+  sanitized.title = toTrimmedString(sanitized.title) || `${lesson?.title || "Lesson"} Quiz`;
+  if (sanitized.description !== undefined) {
+    sanitized.description = toTrimmedString(sanitized.description) || null;
+  }
+  const passingScoreValue = Number.parseInt(sanitized.passingScore, 10);
+  sanitized.passingScore = Number.isFinite(passingScoreValue) ? Math.min(Math.max(passingScoreValue, 0), 100) : 70;
+  sanitized.timeLimit = toPositiveIntegerOrNull(sanitized.timeLimit);
+  sanitized.maxAttempts = toPositiveIntegerOrNull(sanitized.maxAttempts);
+  sanitized.shuffleQuestions = Boolean(sanitized.shuffleQuestions);
+  sanitized.shuffleOptions = Boolean(sanitized.shuffleOptions);
+  sanitized.showCorrectAnswers = sanitized.showCorrectAnswers === true;
+  sanitized.showScore = sanitized.showScore !== false;
+  sanitized.isRequired = sanitized.isRequired !== false;
+  sanitized.isPublished = sanitized.isPublished !== false;
+  sanitized.questions = sanitizeQuizQuestionsForSave(sanitized.questions);
+  sanitized.totalQuestions = sanitized.questions.length;
+  sanitized.totalPoints = sanitized.questions.length * DEFAULT_QUIZ_POINTS;
+
+  return compactObject(sanitized);
+};
+
 const sanitizeLessonsForSave = (lessons) =>
   ensureArray(lessons)
     .map((lesson, index) => {
@@ -80,6 +154,7 @@ const sanitizeLessonsForSave = (lessons) =>
       const order = Number.parseInt(sanitized.order, 10);
       sanitized.order = Number.isFinite(order) && order > 0 ? order : index + 1;
       sanitized.resources = sanitizeResourcesForSave(sanitized.resources);
+      sanitized.quiz = sanitizeQuizForSave(lesson.quiz ?? sanitized.quiz, lesson, index);
 
       return compactObject(sanitized);
     })

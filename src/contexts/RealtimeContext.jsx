@@ -20,83 +20,83 @@ export const useRealtime = () => {
 };
 
 export const RealtimeProvider = ({ children }) => {
-  const { currentUser, isAuthenticated, isAdmin } = useAuth();
+  const { currentUser, isAuthenticated, isAdmin, loading: authLoading } = useAuth();
 
   // ============================================================================
   // REAL-TIME DATA HOOKS
   // ============================================================================
 
   // Courses data
-  const { 
-    data: courses, 
-    loading: coursesLoading, 
-    error: coursesError 
-  } = useRealtimeCourses({ 
-    publishedOnly: true, 
-    limitCount: 50 
+  const {
+    data: courses,
+    loading: coursesLoading,
+    error: coursesError
+  } = useRealtimeCourses({
+    publishedOnly: true,
+    limitCount: 50
   });
 
   // User enrollments
-  const { 
-    enrollments, 
-    loading: enrollmentsLoading, 
-    error: enrollmentsError, 
+  const {
+    enrollments,
+    loading: enrollmentsLoading,
+    error: enrollmentsError,
     isEnrolled,
-    enrollmentCount 
-  } = useRealtimeUserEnrollments(currentUser?.uid, { 
-    enabled: isAuthenticated 
+    enrollmentCount
+  } = useRealtimeUserEnrollments(currentUser?.uid, {
+    enabled: isAuthenticated
   });
 
-  // Admin data (only load if user is admin)
-  const { 
-    data: adminUsers, 
-    loading: adminUsersLoading, 
-    error: adminUsersError 
-  } = useRealtimeAdminUsers({ 
-    enabled: isAdmin 
+  // Admin data (only load if user is admin AND authenticated)
+  const {
+    data: adminUsers,
+    loading: adminUsersLoading,
+    error: adminUsersError
+  } = useRealtimeAdminUsers({
+    enabled: isAdmin && isAuthenticated && !authLoading
   });
 
-  const { 
-    data: adminEnrollments, 
-    loading: adminEnrollmentsLoading, 
-    error: adminEnrollmentsError 
-  } = useRealtimeAdminEnrollments({ 
-    enabled: isAdmin 
+  const {
+    data: adminEnrollments,
+    loading: adminEnrollmentsLoading,
+    error: adminEnrollmentsError
+  } = useRealtimeAdminEnrollments({
+    enabled: isAdmin && isAuthenticated && !authLoading
   });
 
-  const { 
-    data: adminPayments, 
-    loading: adminPaymentsLoading, 
-    error: adminPaymentsError 
-  } = useRealtimeAdminPayments({ 
-    enabled: isAdmin 
+  const {
+    data: adminPayments,
+    loading: adminPaymentsLoading,
+    error: adminPaymentsError
+  } = useRealtimeAdminPayments({
+    enabled: isAdmin && isAuthenticated && !authLoading
   });
 
   // Coupons data
-  const { 
-    data: coupons, 
-    loading: couponsLoading, 
-    error: couponsError 
-  } = useRealtimeCoupons({ 
-    activeOnly: true 
+  const {
+    data: coupons,
+    loading: couponsLoading,
+    error: couponsError
+  } = useRealtimeCoupons({
+    activeOnly: true
   });
 
   // ============================================================================
   // REAL-TIME MUTATION HOOKS
   // ============================================================================
 
-  const { 
-    updateCourse, 
-    createCourse, 
-    loading: courseMutationsLoading, 
-    error: courseMutationsError 
+  const {
+    updateCourse,
+    createCourse,
+    loading: courseMutationsLoading,
+    error: courseMutationsError
   } = useRealtimeCourseMutations();
 
-  const { 
-    createEnrollment, 
-    updateEnrollmentProgress, 
-    loading: enrollmentMutationsLoading, 
-    error: enrollmentMutationsError 
+  const {
+    createEnrollment,
+    updateEnrollmentProgress,
+    loading: enrollmentMutationsLoading,
+    error: enrollmentMutationsError
   } = useRealtimeEnrollmentMutations();
 
   // ============================================================================

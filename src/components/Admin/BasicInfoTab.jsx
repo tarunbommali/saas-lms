@@ -24,17 +24,13 @@ const BasicInfoTab = ({ course, handleCourseChange, errors }) => {
         {/* Category */}
         <FormField
           label="Category"
-          type="select"
+          type="text"
           value={course.category}
           onChange={(value) => handleCourseChange("category", value)}
+          placeholder="e.g., Web Development"
           required
-        >
-          <option value="web-development">Web Development</option>
-          <option value="mobile-development">Mobile Development</option>
-          <option value="data-science">Data Science</option>
-          <option value="design">Design</option>
-          <option value="business">Business</option>
-        </FormField>
+          error={errors.category}
+        />
 
         {/* Short Description */}
         <FormField

@@ -9,8 +9,9 @@ import { useRealtimeEnrollmentStatus } from '../hooks/useRealtimeApi.js';
 import { updateUserProgress } from '../services/index.js';
 import VideoPlayer from '../components/Course/VideoPlayer.jsx';
 import CourseContentShimmer from '../components/Course/CourseContentShimmer.jsx';
+import LessonQuizPane from '../components/learning/LessonQuizPane.jsx';
 import { global_classnames } from "../utils/classnames.js";
-import { PlayCircle, List, ArrowRight, Clock, CheckCircle, Lock, AlertTriangle, FileText, Link as LinkIcon, Image as ImageIcon, Download } from 'lucide-react';
+import { PlayCircle, List, ArrowRight, Clock, CheckCircle, Lock, AlertTriangle, FileText, FileQuestion, Link as LinkIcon, Image as ImageIcon, Download } from 'lucide-react';
 
 const clampPercentage = (value) => Math.min(100, Math.max(0, Number(value) || 0));
 
@@ -269,8 +270,9 @@ const LearnPage = () => {
         userProgress,
     } = useLearnPage();
 
-    // Track the currently selected video within the current module
-    const [selectedVideo, setSelectedVideo] = useState(null);
+    // Track the currently selected lesson and the active content view
+    const [selectedLesson, setSelectedLesson] = useState(null);
+    const [activeContentType, setActiveContentType] = useState('video');
     // Expand/collapse state per module
     const [expandedModules, setExpandedModules] = useState({});
     const [videoCompletionMap, setVideoCompletionMap] = useState({});
@@ -289,46 +291,88 @@ const LearnPage = () => {
         }
     }, [isAuthenticated, currentUser, courseId, isEnrolled, fetchCourseContent]);
 
-    // Initialize selected video on module/content changes, using last played if available
+    // Initialize selected lesson on module/content changes, using last played if available
     useEffect(() => {
-        if (!courseContent || courseContent.length === 0) return;
+        if (!Array.isArray(courseContent) || courseContent.length === 0) {
+            return;
+        }
+
+        const findLesson = (moduleId, lessonId) => {
+            if (!moduleId || !lessonId) return null;
+            const module = courseContent.find((mod) => mod.id === moduleId);
+            if (!module) return null;
+            const lesson = Array.isArray(module.videos)
+                ? module.videos.find((entry) => entry.id === lessonId)
+                : null;
+            if (!lesson) return null;
+            return { module, lesson };
+        };
+
+        const deriveDefaultContentType = (lesson) => {
+            if (!lesson) return 'video';
+            const lessonType = (lesson.type || 'video').toLowerCase();
+            if (lessonType === 'quiz' && lesson.quiz?.id) {
+                return 'quiz';
+            }
+            return 'video';
+        };
+
+        const assignSelection = (module, lesson) => {
+            if (module) {
+                setCurrentModule(module);
+            }
+            setSelectedLesson(lesson || null);
+            const nextType = deriveDefaultContentType(lesson);
+            setActiveContentType((prev) => (prev === nextType ? prev : nextType));
+        };
+
         if (!currentModule) {
-            // No module selected yet — restore last played or default to first module/video
-            // Prefer cloud lastPlayed over local
             if (lastPlayed?.moduleId && lastPlayed?.videoId) {
-                const mod = courseContent.find(m => m.id === lastPlayed.moduleId);
-                const vid = mod?.videos?.find(v => v.id === lastPlayed.videoId);
-                if (mod && vid) {
-                    setCurrentModule(mod);
-                    setSelectedVideo(vid);
+                const restored = findLesson(lastPlayed.moduleId, lastPlayed.videoId);
+                if (restored) {
+                    assignSelection(restored.module, restored.lesson);
                     return;
                 }
             }
+
             if (lastPlayedKey) {
                 try {
                     const saved = JSON.parse(localStorage.getItem(lastPlayedKey) || 'null');
                     if (saved?.moduleId && saved?.videoId) {
-                        const mod = courseContent.find(m => m.id === saved.moduleId);
-                        const vid = mod?.videos?.find(v => v.id === saved.videoId);
-                        if (mod && vid) {
-                            setCurrentModule(mod);
-                            setSelectedVideo(vid);
+                        const restored = findLesson(saved.moduleId, saved.videoId);
+                        if (restored) {
+                            assignSelection(restored.module, restored.lesson);
                             return;
                         }
                     }
-                } catch { /* ignore */ }
+                } catch {
+                    /* ignore */
+                }
             }
-            // Fallback default
+
             const firstModule = courseContent[0];
-            setCurrentModule(firstModule);
-            setSelectedVideo(firstModule?.videos?.[0] || null);
-        } else {
-            // Ensure a selected video when module is known
-            if (!selectedVideo) {
-                setSelectedVideo(currentModule?.videos?.[0] || null);
-            }
+            const firstLesson = firstModule?.videos?.[0] || null;
+            assignSelection(firstModule, firstLesson);
+            return;
         }
-    }, [courseContent, currentModule, lastPlayedKey, lastPlayed]);
+
+        if (!selectedLesson) {
+            const fallbackLesson = currentModule.videos?.[0] || null;
+            if (fallbackLesson !== selectedLesson) {
+                assignSelection(null, fallbackLesson);
+            }
+            return;
+        }
+
+        const lessonStillInModule = Array.isArray(currentModule.videos)
+            ? currentModule.videos.some((entry) => entry.id === selectedLesson.id)
+            : false;
+
+        if (!lessonStillInModule) {
+            const nextLesson = currentModule.videos?.[0] || null;
+            assignSelection(null, nextLesson);
+        }
+    }, [courseContent, currentModule, lastPlayed, lastPlayedKey, selectedLesson, setCurrentModule]);
 
     useEffect(() => {
         if (!courseContent || courseContent.length === 0) return;
@@ -338,6 +382,12 @@ const LearnPage = () => {
             return all;
         });
     }, [courseContent, currentModule]);
+
+    useEffect(() => {
+        if (!selectedLesson?.quiz?.id && activeContentType === 'quiz') {
+            setActiveContentType('video');
+        }
+    }, [selectedLesson?.quiz?.id, activeContentType]);
 
     const progressStats = useMemo(() => computeProgressStats(courseContent, videoCompletionMap), [courseContent, videoCompletionMap]);
     const moduleProgressMap = progressStats.modules;
@@ -386,15 +436,15 @@ const LearnPage = () => {
         }
     }, []);
 
-    const pushProgressUpdate = useCallback(({ lastPlayedOverride, debounceMs = 500, moduleOverride, videoOverride } = {}) => {
+    const pushProgressUpdate = useCallback(({ lastPlayedOverride, debounceMs = 500, moduleOverride, lessonOverride } = {}) => {
         if (!currentUser?.uid || !courseId || !Array.isArray(courseContent) || courseContent.length === 0) {
             return;
         }
 
         const resolvedModule = moduleOverride || currentModule;
-        const resolvedVideo = videoOverride || selectedVideo;
-        const resolvedLastPlayed = lastPlayedOverride || (resolvedModule && resolvedVideo
-            ? { moduleId: resolvedModule.id, videoId: resolvedVideo.id, ts: Date.now() }
+        const resolvedLesson = lessonOverride || selectedLesson;
+        const resolvedLastPlayed = lastPlayedOverride || (resolvedModule && resolvedLesson
+            ? { moduleId: resolvedModule.id, videoId: resolvedLesson.id, ts: Date.now() }
             : (lastPlayed ?? null));
 
         const payload = buildProgressPayload(courseContent, videoCompletionMap, resolvedLastPlayed, userProgress);
@@ -416,17 +466,17 @@ const LearnPage = () => {
             }
             triggerUpdate();
         }
-    }, [courseContent, courseId, currentModule, currentUser?.uid, lastPlayed, selectedVideo, userProgress, videoCompletionMap]);
+    }, [courseContent, courseId, currentModule, currentUser?.uid, lastPlayed, selectedLesson, userProgress, videoCompletionMap]);
 
     // Persist last played selection per course/user (local + cloud)
     useEffect(() => {
-        if (!lastPlayedKey || !currentModule || !selectedVideo) return;
-        const payload = { moduleId: currentModule.id, videoId: selectedVideo.id, ts: Date.now() };
+        if (!lastPlayedKey || !currentModule || !selectedLesson) return;
+        const payload = { moduleId: currentModule.id, videoId: selectedLesson.id, ts: Date.now() };
         try { localStorage.setItem(lastPlayedKey, JSON.stringify(payload)); } catch { /* ignore */ }
         if (isAuthenticated && currentUser?.uid && courseId) {
-            pushProgressUpdate({ lastPlayedOverride: payload, debounceMs: 0, moduleOverride: currentModule, videoOverride: selectedVideo });
+            pushProgressUpdate({ lastPlayedOverride: payload, debounceMs: 0, moduleOverride: currentModule, lessonOverride: selectedLesson });
         }
-    }, [courseId, currentModule, currentUser?.uid, isAuthenticated, lastPlayedKey, pushProgressUpdate, selectedVideo]);
+    }, [courseId, currentModule, currentUser?.uid, isAuthenticated, lastPlayedKey, pushProgressUpdate, selectedLesson]);
 
     useEffect(() => {
         if (syncSkipRef.current) {
@@ -443,18 +493,24 @@ const LearnPage = () => {
         }
     }, []);
 
-    const activeVideoData = selectedVideo || currentModule?.videos?.[0] || null;
+    const activeLesson = selectedLesson || currentModule?.videos?.[0] || null;
+    const hasQuizForLesson = Boolean(activeLesson?.quiz?.id);
+    const isQuizSelection = hasQuizForLesson && activeContentType === 'quiz';
+    const ActiveIcon = isQuizSelection ? FileQuestion : PlayCircle;
+    const headerTitle = isQuizSelection
+        ? (activeLesson?.quiz?.title || activeLesson?.title || currentModule?.title || 'Lesson Quiz')
+        : (activeLesson?.title || currentModule?.title || 'Lesson Video');
 
     const handleVideoProgress = useCallback(async (progressData) => {
-        if (!activeVideoData || !currentModule || !courseId) return;
+        if (!activeLesson || !currentModule || !courseId || activeContentType !== 'video') return;
 
         if (progressData.percentage >= 80) {
             setVideoCompletionMap((prev) => {
-                const alreadyCompleted = prev[currentModule.id]?.[activeVideoData.id];
+                const alreadyCompleted = prev[currentModule.id]?.[activeLesson.id];
                 if (alreadyCompleted) return prev;
                 const nextModuleMap = {
                     ...(prev[currentModule.id] || {}),
-                    [activeVideoData.id]: true,
+                    [activeLesson.id]: true,
                 };
                 return {
                     ...prev,
@@ -462,19 +518,19 @@ const LearnPage = () => {
                 };
             });
         }
-    }, [activeVideoData, courseId, currentModule]);
+    }, [activeLesson, activeContentType, courseId, currentModule]);
 
     // Handle video completion
     const handleVideoComplete = useCallback(async () => {
-        if (!currentModule || !courseId || !activeVideoData) return;
+        if (!currentModule || !courseId || !activeLesson || activeContentType !== 'video') return;
         setVideoCompletionMap((prev) => ({
             ...prev,
             [currentModule.id]: {
                 ...(prev[currentModule.id] || {}),
-                [activeVideoData.id]: true,
+                [activeLesson.id]: true,
             },
         }));
-    }, [activeVideoData, courseId, currentModule]);
+    }, [activeLesson, activeContentType, courseId, currentModule]);
 
     const handleVideoCompletionToggle = useCallback((moduleId, videoId, checked) => {
         setVideoCompletionMap((prev) => {
@@ -523,23 +579,58 @@ const LearnPage = () => {
 
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
 
-                    {/* LEFT COLUMN: Video Player (2/3 width) */}
+                    {/* LEFT COLUMN: Video/Quiz Pane (2/3 width) */}
                     <div className="lg:col-span-2 space-y-4">
                         <div className="card shadow-md">
-                            <h2 className="text-xl font-semibold text-high flex items-center gap-2 border-b border-theme pb-2 mb-4">
-                                <PlayCircle className="w-5 h-5 text-primary" />
-                                {currentModule?.title || 'Video Title'}
-                            </h2>
+                            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-theme pb-2 mb-4">
+                                <div className="flex items-center gap-2">
+                                    <ActiveIcon className="w-5 h-5 text-primary" />
+                                    <h2 className="text-xl font-semibold text-high">{headerTitle}</h2>
+                                </div>
+                                {hasQuizForLesson && (
+                                    <div className="flex rounded-full border border-theme overflow-hidden text-sm">
+                                        <button
+                                            type="button"
+                                            onClick={() => setActiveContentType('video')}
+                                            className={`px-3 py-1 transition-colors ${activeContentType === 'video' ? 'bg-primary text-white' : 'bg-surface text-medium hover:bg-hover'}`}
+                                        >
+                                            Video
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => setActiveContentType('quiz')}
+                                            className={`px-3 py-1 transition-colors ${activeContentType === 'quiz' ? 'bg-primary text-white' : 'bg-surface text-medium hover:bg-hover'}`}
+                                        >
+                                            Quiz
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
 
-                            {activeVideoData ? (
-                                <VideoPlayer
-                                    video={activeVideoData}
-                                    onProgressUpdate={handleVideoProgress}
-                                    onVideoComplete={handleVideoComplete}
-                                    className="w-full"
-                                    showControls={true}
-                                    allowDownload={true}
-                                />
+                            {activeLesson ? (
+                                isQuizSelection ? (
+                                    <LessonQuizPane
+                                        key={activeLesson.quiz.id}
+                                        quizMeta={activeLesson.quiz}
+                                        courseId={courseId}
+                                        moduleId={currentModule?.id}
+                                        lessonId={activeLesson.lessonId || activeLesson.id}
+                                        onQuizCompleted={() => {
+                                            if (currentModule?.id && activeLesson?.id) {
+                                                handleVideoCompletionToggle(currentModule.id, activeLesson.id, true);
+                                            }
+                                        }}
+                                    />
+                                ) : (
+                                    <VideoPlayer
+                                        video={activeLesson}
+                                        onProgressUpdate={handleVideoProgress}
+                                        onVideoComplete={handleVideoComplete}
+                                        className="w-full"
+                                        showControls={true}
+                                        allowDownload={true}
+                                    />
+                                )
                             ) : (
                                 <div className="aspect-video bg-black/90 rounded-lg flex items-center justify-center text-white">
                                     <div className="text-center">
@@ -615,6 +706,9 @@ const LearnPage = () => {
                                     const isUnlocked = isModuleUnlocked(module, index);
                                     const isCompleted = moduleProgress?.isCompleted || false;
                                     const isCurrent = currentModule?.id === module.id;
+                                    const lessons = Array.isArray(module.videos) ? module.videos.filter(Boolean) : [];
+                                    const videoLessons = lessons.filter((lesson) => (lesson.type || 'video').toLowerCase() !== 'quiz');
+                                    const quizLessons = lessons.filter((lesson) => Boolean(lesson.quiz?.id) || (lesson.type || '').toLowerCase() === 'quiz');
 
                                     return (
                                         <li
@@ -631,10 +725,18 @@ const LearnPage = () => {
                                                 onClick={() => {
                                                     if (!isUnlocked) return;
                                                     setCurrentModule(module);
-                                                    setSelectedVideo((prev) => {
-                                                        const existsInModule = module.videos?.some(v => v.id === prev?.id);
-                                                        return existsInModule ? prev : (module.videos?.[0] || null);
-                                                    });
+                                                    const containsSelection = lessons.some((lesson) => lesson.id === selectedLesson?.id);
+                                                    if (!containsSelection) {
+                                                        const nextLesson = videoLessons[0] || lessons[0] || null;
+                                                        setSelectedLesson(nextLesson || null);
+                                                        if (videoLessons[0]) {
+                                                            setActiveContentType('video');
+                                                        } else if (nextLesson?.quiz?.id) {
+                                                            setActiveContentType('quiz');
+                                                        } else {
+                                                            setActiveContentType('video');
+                                                        }
+                                                    }
                                                 }}
                                             >
                                                 <div className="flex-1">
@@ -684,91 +786,145 @@ const LearnPage = () => {
                                                 </div>
                                             )}
 
-                                            {/* Videos list */}
-                                            {isUnlocked && expandedModules[module.id] && Array.isArray(module.videos) && module.videos.length > 0 && (
-                                                <div className="mt-3 space-y-2">
-                                                    {module.videos.map((vid, vIdx) => {
-                                                        const isActive = selectedVideo?.id === vid.id;
-                                                        const resourceList = Array.isArray(vid.resources) ? vid.resources.filter(Boolean) : [];
-                                                        const isVideoCompleted = Boolean(videoCompletionMap[module.id]?.[vid.id]);
-                                                        return (
-                                                            <div
-                                                                key={vid.id || vIdx}
-                                                                onClick={() => { setCurrentModule(module); setSelectedVideo(vid); }}
-                                                                className={`p-2 rounded border transition-colors ${isActive
-                                                                        ? 'bg-blue-100 dark:bg-blue-900/40 border-primary'
-                                                                        : 'hover:bg-hover border-theme'
-                                                                    } ${isUnlocked ? 'cursor-pointer' : 'cursor-not-allowed'}`}
-                                                            >
-                                                                <div className="flex items-center justify-between gap-3">
-                                                                    <div className="flex items-center gap-3 flex-1 min-w-0">
-                                                                        <input
-                                                                            type="checkbox"
-                                                                            className="h-4 w-4 rounded border-theme text-primary focus:ring-primary bg-surface"
-                                                                            checked={isVideoCompleted}
-                                                                            disabled={!isUnlocked}
-                                                                            onClick={(event) => event.stopPropagation()}
-                                                                            onChange={(event) => {
-                                                                                event.stopPropagation();
-                                                                                handleVideoCompletionToggle(module.id, vid.id, event.target.checked);
+                                            {/* Lesson lists */}
+                                            {isUnlocked && expandedModules[module.id] && lessons.length > 0 && (
+                                                <div className="mt-3 space-y-4">
+                                                    {videoLessons.length > 0 && (
+                                                        <div>
+                                                            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-low">Videos</p>
+                                                            <div className="space-y-2">
+                                                                {videoLessons.map((lesson, vIdx) => {
+                                                                    const isActiveVideo = selectedLesson?.id === lesson.id && activeContentType === 'video';
+                                                                    const resourceList = Array.isArray(lesson.resources) ? lesson.resources.filter(Boolean) : [];
+                                                                    const isItemCompleted = Boolean(videoCompletionMap[module.id]?.[lesson.id]);
+                                                                    return (
+                                                                        <div
+                                                                            key={lesson.id || vIdx}
+                                                                            onClick={() => {
+                                                                                if (!isUnlocked) return;
+                                                                                setCurrentModule(module);
+                                                                                setSelectedLesson(lesson);
+                                                                                setActiveContentType('video');
                                                                             }}
-                                                                        />
-                                                                        <div className={`text-sm font-medium truncate ${isActive ? 'text-primary' : 'text-medium'}`}>
-                                                                            {vid.title || `Video ${vIdx + 1}`}
-                                                                        </div>
-                                                                    </div>
-                                                                    {vid.duration && (
-                                                                        <div className="text-xs text-low ml-3 flex-shrink-0 flex items-center gap-1">
-                                                                            <Clock className="w-3 h-3" />
-                                                                            <span>{vid.duration}</span>
-                                                                        </div>
-                                                                    )}
-                                                                </div>
-
-                                                                {resourceList.length > 0 && (
-                                                                    <div className="mt-2 space-y-1 text-xs text-medium">
-                                                                        {resourceList.map((resource, rIdx) => {
-                                                                            const resourceTitle = resource.title || resource.type || `Resource ${rIdx + 1}`;
-                                                                            const resourceUrl = resource.url && typeof resource.url === 'string' ? resource.url : null;
-                                                                            const icon = renderResourceIcon(resource.type);
-
-                                                                            const content = (
-                                                                                <div className="flex items-center gap-2">
-                                                                                    <span className="flex items-center justify-center w-5 h-5 rounded-full bg-surface-elevated text-medium">
-                                                                                        {icon}
-                                                                                    </span>
-                                                                                    <span className="truncate">
-                                                                                        {resourceTitle}
-                                                                                    </span>
+                                                                            className={`p-2 rounded border transition-colors ${isActiveVideo
+                                                                                    ? 'bg-blue-100 dark:bg-blue-900/40 border-primary'
+                                                                                    : 'hover:bg-hover border-theme'
+                                                                                } ${isUnlocked ? 'cursor-pointer' : 'cursor-not-allowed'}`}
+                                                                        >
+                                                                            <div className="flex items-center justify-between gap-3">
+                                                                                <div className="flex items-center gap-3 flex-1 min-w-0">
+                                                                                    <input
+                                                                                        type="checkbox"
+                                                                                        className="h-4 w-4 rounded border-theme text-primary focus:ring-primary bg-surface"
+                                                                                        checked={isItemCompleted}
+                                                                                        disabled={!isUnlocked}
+                                                                                        onClick={(event) => event.stopPropagation()}
+                                                                                        onChange={(event) => {
+                                                                                            event.stopPropagation();
+                                                                                            handleVideoCompletionToggle(module.id, lesson.id, event.target.checked);
+                                                                                        }}
+                                                                                    />
+                                                                                    <div className={`flex items-center gap-2 text-sm font-medium truncate ${isActiveVideo ? 'text-primary' : 'text-medium'}`}>
+                                                                                        <PlayCircle className="h-4 w-4 text-primary" />
+                                                                                        <span className="truncate">
+                                                                                            {lesson.title || `Video ${vIdx + 1}`}
+                                                                                        </span>
+                                                                                    </div>
                                                                                 </div>
-                                                                            );
+                                                                                {lesson.duration && (
+                                                                                    <div className="text-xs text-low ml-3 flex-shrink-0 flex items-center gap-1">
+                                                                                        <Clock className="w-3 h-3" />
+                                                                                        <span>{lesson.duration}</span>
+                                                                                    </div>
+                                                                                )}
+                                                                            </div>
 
-                                                                            return resourceUrl ? (
-                                                                                <a
-                                                                                    key={resource.id || rIdx}
-                                                                                    href={resourceUrl}
-                                                                                    target="_blank"
-                                                                                    rel="noopener noreferrer"
-                                                                                    className="block rounded px-2 py-1 hover:bg-hover hover:text-primary transition-colors"
-                                                                                    onClick={(event) => event.stopPropagation()}
-                                                                                >
-                                                                                    {content}
-                                                                                </a>
-                                                                            ) : (
-                                                                                <div
-                                                                                    key={resource.id || rIdx}
-                                                                                    className="block rounded px-2 py-1 bg-surface-elevated text-low"
-                                                                                    onClick={(event) => event.stopPropagation()}
-                                                                                >
-                                                                                    {content}
+                                                                            {resourceList.length > 0 && (
+                                                                                <div className="mt-2 space-y-1 text-xs text-medium">
+                                                                                    {resourceList.map((resource, rIdx) => {
+                                                                                        const resourceTitle = resource.title || resource.type || `Resource ${rIdx + 1}`;
+                                                                                        const resourceUrl = resource.url && typeof resource.url === 'string' ? resource.url : null;
+                                                                                        const icon = renderResourceIcon(resource.type);
+
+                                                                                        const content = (
+                                                                                            <div className="flex items-center gap-2">
+                                                                                                <span className="flex items-center justify-center w-5 h-5 rounded-full bg-surface-elevated text-medium">
+                                                                                                    {icon}
+                                                                                                </span>
+                                                                                                <span className="truncate">
+                                                                                                    {resourceTitle}
+                                                                                                </span>
+                                                                                            </div>
+                                                                                        );
+
+                                                                                        return resourceUrl ? (
+                                                                                            <a
+                                                                                                key={resource.id || rIdx}
+                                                                                                href={resourceUrl}
+                                                                                                target="_blank"
+                                                                                                rel="noopener noreferrer"
+                                                                                                className="block rounded px-2 py-1 hover:bg-hover hover:text-primary transition-colors"
+                                                                                                onClick={(event) => event.stopPropagation()}
+                                                                                            >
+                                                                                                {content}
+                                                                                            </a>
+                                                                                        ) : (
+                                                                                            <div
+                                                                                                key={resource.id || rIdx}
+                                                                                                className="block rounded px-2 py-1 bg-surface-elevated text-low"
+                                                                                                onClick={(event) => event.stopPropagation()}
+                                                                                            >
+                                                                                                {content}
+                                                                                            </div>
+                                                                                        );
+                                                                                    })}
                                                                                 </div>
-                                                                            );
-                                                                        })}
-                                                                    </div>
-                                                                )}
+                                                                            )}
+                                                                        </div>
+                                                                    );
+                                                                })}
                                                             </div>
-                                                        );
-                                                    })}
+                                                        </div>
+                                                    )}
+
+                                                    {quizLessons.length > 0 && (
+                                                        <div>
+                                                            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-purple-700">Quizzes</p>
+                                                            <div className="space-y-2">
+                                                                {quizLessons.map((lesson, qIdx) => {
+                                                                    const isActiveQuiz = selectedLesson?.id === lesson.id && activeContentType === 'quiz';
+                                                                    const isQuizCompleted = Boolean(videoCompletionMap[module.id]?.[lesson.id]);
+                                                                    return (
+                                                                        <div
+                                                                            key={`${lesson.quiz?.id || lesson.id || qIdx}-quiz`}
+                                                                            onClick={() => {
+                                                                                if (!isUnlocked) return;
+                                                                                setCurrentModule(module);
+                                                                                setSelectedLesson(lesson);
+                                                                                setActiveContentType('quiz');
+                                                                            }}
+                                                                            className={`p-2 rounded border transition-colors ${isActiveQuiz
+                                                                                    ? 'bg-purple-100 dark:bg-purple-900/30 border-purple-500'
+                                                                                    : 'hover:bg-hover border-theme'
+                                                                                } ${isUnlocked ? 'cursor-pointer' : 'cursor-not-allowed'}`}
+                                                                        >
+                                                                            <div className="flex items-center justify-between gap-3">
+                                                                                <div className={`flex items-center gap-2 text-sm font-medium truncate ${isActiveQuiz ? 'text-primary' : 'text-medium'}`}>
+                                                                                    <FileQuestion className="h-4 w-4 text-purple-600" />
+                                                                                    <span className="truncate">
+                                                                                        {lesson.quiz?.title || lesson.title || `Quiz ${qIdx + 1}`}
+                                                                                    </span>
+                                                                                </div>
+                                                                                {isQuizCompleted && (
+                                                                                    <span className="text-xs font-semibold text-success">Completed</span>
+                                                                                )}
+                                                                            </div>
+                                                                        </div>
+                                                                    );
+                                                                })}
+                                                            </div>
+                                                        </div>
+                                                    )}
                                                 </div>
                                             )}
                                         </li>

@@ -25,16 +25,26 @@ const items = [
 const seriesCache = new Map();
 
 const Analytics = () => {
-  const { isAdmin } = useAuth();
+  const { isAdmin, loading: authLoading } = useAuth();
   const [loading, setLoading] = useState(true);
   const [timeRange, setTimeRange] = useState("30d");
+
+  if (authLoading || isAdmin === null || isAdmin === undefined) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-gray-50">
+        <LoadingSpinner size="lg" aria-label="Checking admin access" />
+      </div>
+    );
+  }
 
   if (!isAdmin) return <Navigate to="/" replace />;
 
   // Live data streams
-  const { data: users = [], loading: usersLoading } = useRealtimeAdminUsers({ enabled: true });
-  const { data: enrollments = [], loading: enrollmentsLoading } = useRealtimeAdminEnrollments({ enabled: true });
-  const { data: payments = [], loading: paymentsLoading } = useRealtimeAdminPayments({ enabled: true });
+  const enabledAdminRealtime = isAdmin && !authLoading;
+
+  const { data: users = [], loading: usersLoading } = useRealtimeAdminUsers({ enabled: enabledAdminRealtime });
+  const { data: enrollments = [], loading: enrollmentsLoading } = useRealtimeAdminEnrollments({ enabled: enabledAdminRealtime });
+  const { data: payments = [], loading: paymentsLoading } = useRealtimeAdminPayments({ enabled: enabledAdminRealtime });
   const { data: courses = [], loading: coursesLoading } = useRealtimeCourses({ publishedOnly: true });
 
   useEffect(() => {

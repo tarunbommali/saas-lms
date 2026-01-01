@@ -5,6 +5,7 @@
 import React, { useState, useEffect } from "react";
 import { useAuth } from "../../../contexts/AuthContext.jsx";
 import { Navigate, useNavigate, Link } from "react-router-dom";
+import LoadingSpinner from "../../../components/ui/LoadingSpinner.jsx";
 import {
   Search,
   Mail,
@@ -28,7 +29,7 @@ const items = [
 ];
 
 const UsersManagement = () => {
-  const { isAdmin } = useAuth();
+  const { isAdmin, loading: authLoading } = useAuth();
   const navigate = useNavigate();
 
   const [users, setUsers] = useState([]);
@@ -161,9 +162,12 @@ const UsersManagement = () => {
 
   // If isAdmin is strictly false, we still render the page briefly while toast shows and redirect happens.
   // If isAdmin is null/undefined (auth loading state), keep rendering nothing or a loader if you prefer.
-  if (isAdmin === null || isAdmin === undefined) {
-    // optional: show a loader while auth resolves
-    return null;
+  if (authLoading || isAdmin === null || isAdmin === undefined) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-gray-50">
+        <LoadingSpinner size="lg" aria-label="Checking admin access" />
+      </div>
+    );
   }
 
   return (

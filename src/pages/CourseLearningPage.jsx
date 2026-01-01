@@ -253,6 +253,7 @@ const CourseLearningPage = () => {
                           {lessons.map((lesson, lessonIndex) => {
                             const lessonProgress = lesson.progress;
                             const lessonCompleted = lessonProgress?.isCompleted;
+                            const lessonQuiz = lesson.quiz;
 
                             return (
                               <div
@@ -297,6 +298,15 @@ const CourseLearningPage = () => {
                                   >
                                     {lessonCompleted ? 'Review' : 'Start'}
                                   </Button>
+                                  {lessonQuiz && (
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      onClick={() => navigate(`/learn/${courseId}/quiz/${lessonQuiz.id}`)}
+                                    >
+                                      Take Quiz
+                                    </Button>
+                                  )}
                                 </div>
                               </div>
                             );

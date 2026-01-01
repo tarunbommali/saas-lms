@@ -1,6 +1,6 @@
 /* eslint-disable no-unused-vars */
-import React, { useState } from "react";
-import { Link, Navigate } from "react-router-dom";
+import React, { useMemo, useState } from "react";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext.jsx";
 import logo from "../assets/logo.jpg";
 import { Loader2 } from "lucide-react";
@@ -11,25 +11,45 @@ const SignIn = () => {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
-  const { signin, signinWithGoogle, currentUser } = useAuth();
+  const { signin, signinWithGoogle, currentUser, logout } = useAuth();
+  const [logoutLoading, setLogoutLoading] = useState(false);
+  const location = useLocation();
+  const navigate = useNavigate();
+
+  const redirectPath = useMemo(() => {
+    const fromState = location.state?.from;
+    if (!fromState) return "/";
+    if (typeof fromState === "string") return fromState || "/";
+    const { pathname = "/", search = "", hash = "" } = fromState;
+    return `${pathname}${search}${hash}` || "/";
+  }, [location.state]);
+
+  const redirectLabel = redirectPath === "/" ? "Go to Home" : "Return to Previous Page";
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
     setLoading(true);
     try {
-      await signin(email, password);
+      const user = await signin(email, password);
+      if (user) {
+        navigate(redirectPath, { replace: true });
+      }
     } catch (err) {
       setError(err?.message || "Login failed. Please check your email and password.");
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   const handleGoogle = async () => {
     setError("");
     setGoogleLoading(true);
     try {
-      await signinWithGoogle();
+      const user = await signinWithGoogle();
+      if (user) {
+        navigate(redirectPath, { replace: true });
+      }
     } catch (err) {
       console.error('Google sign-in error:', err);
       let errorMessage = "Google sign-in failed. ";
@@ -43,12 +63,23 @@ const SignIn = () => {
         errorMessage += "Please try again.";
       }
       setError(errorMessage);
+    } finally {
+      setGoogleLoading(false);
     }
-    setGoogleLoading(false);
   };
 
-  // Redirect authenticated users away from the signin page
-  if (currentUser) return <Navigate to="/" replace />;
+  const handleLogout = async () => {
+    setLogoutLoading(true);
+    try {
+      await logout();
+      // After logout, the page will re-render and currentUser will be null, showing the form
+    } catch (error) {
+      console.error("Logout failed", error);
+    }
+    setLogoutLoading(false);
+  };
+
+  
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4 py-12">
@@ -133,8 +164,8 @@ const SignIn = () => {
             onClick={handleGoogle}
             disabled={loading || googleLoading}
             className={`w-full bg-white border py-3 rounded-lg font-medium shadow-sm transition-colors flex items-center justify-center gap-3 ${loading || googleLoading
-                ? "bg-gray-100 cursor-not-allowed"
-                : "border-gray-300 text-gray-700 hover:bg-gray-50"
+              ? "bg-gray-100 cursor-not-allowed"
+              : "border-gray-300 text-gray-700 hover:bg-gray-50"
               }`}
           >
             {googleLoading ? (
