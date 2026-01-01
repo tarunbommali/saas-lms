@@ -139,7 +139,7 @@ router.post('/login', validateBody(LoginDTO), async (req, res) => {
   }
 });
 
-router.post('/forgot-password', async (req, res) => {
+router.post('/forgot-password', validateBody(ForgotPasswordDTO), async (req, res) => {
   try {
     const { email } = req.body;
 
