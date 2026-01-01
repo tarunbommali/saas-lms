@@ -394,7 +394,7 @@ router.put('/profile', authenticateToken, validateBody(UpdateProfileDTO), async 
   }
 });
 
-router.post('/google', async (req, res) => {
+router.post('/google', validateBody(GoogleAuthDTO), async (req, res) => {
   if (!googleClient) {
     return res.status(500).json({ error: 'Google sign-in is not configured' });
   }
