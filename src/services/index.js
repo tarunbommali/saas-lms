@@ -7,6 +7,9 @@ import {
   usersApi,
   progressApi,
   certificationsApi,
+  modulesApi,
+  quizzesApi,
+  learningProgressApi,
 } from '../api/index.js';
 
 const toError = (error) => {
