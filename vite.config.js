@@ -32,6 +32,7 @@ export default defineConfig(({ mode }) => {
       host: '0.0.0.0',
       port: 3000,
       proxy,
+      allowedHosts: ['a169b887-422a-4075-b61e-0bdf6c0500ed.preview.emergentagent.com', '.preview.emergentagent.com'],
     },
     build: {
       rollupOptions: {
