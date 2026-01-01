@@ -32,7 +32,7 @@ TEST_COURSE_DATA = {
     "shortDescription": "Test course for backend API testing",
     "category": "Technology",
     "instructor": "Test Instructor",
-    "duration": "4 weeks",
+    "duration": 4.0,  # Duration should be numeric (weeks)
     "difficulty": "beginner",
     "language": "English",
     "price": 999,
