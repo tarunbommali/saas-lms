@@ -496,6 +496,11 @@ const initializeDatabase = async () => {
   await ensureColumnExists(client, 'enrollments', 'certificate_issued', 'certificate_issued TINYINT(1) NOT NULL DEFAULT 0');
   await ensureColumnExists(client, 'enrollments', 'certificate_issued_at', 'certificate_issued_at DATETIME');
   await ensureColumnExists(client, 'enrollments', 'certificate_unlocked_at', 'certificate_unlocked_at DATETIME');
+  
+  // Create performance indexes
+  await createPerformanceIndexes(client);
+  
+  console.log('✅ Database tables and indexes initialized');
 };
 
 const seedDefaultAdmin = async () => {
