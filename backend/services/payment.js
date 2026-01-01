@@ -7,6 +7,14 @@ import crypto from 'crypto';
  */
 
 /**
+ * Check if we're in mock payment mode
+ */
+export const isMockPaymentMode = () => {
+  const keyId = process.env.RAZORPAY_KEY_ID || '';
+  return keyId.includes('mock') || keyId.includes('test') || !keyId;
+};
+
+/**
  * Generate Razorpay Order
  */
 export const createRazorpayOrder = async ({
@@ -20,20 +28,25 @@ export const createRazorpayOrder = async ({
     const keyId = process.env.RAZORPAY_KEY_ID;
     const keySecret = process.env.RAZORPAY_KEY_SECRET;
 
-    if (!keyId || !keySecret) {
-      console.warn('Razorpay credentials not configured. Using mock mode.');
-      // Return mock order for development
+    // Check if using mock mode
+    const mockMode = isMockPaymentMode();
+
+    if (mockMode) {
+      console.log('📦 Using MOCK payment mode - Order created without Razorpay API');
+      // Return mock order for development/testing
+      const mockOrderId = `order_mock_${Date.now()}_${crypto.randomBytes(8).toString('hex')}`;
       return {
         success: true,
-        orderId: `order_mock_${Date.now()}`,
+        orderId: mockOrderId,
         amount,
         currency,
         receipt,
         mock: true,
+        message: 'Mock payment order created successfully',
       };
     }
 
-    // In production, integrate with actual Razorpay SDK
+    // In production with real keys, integrate with actual Razorpay SDK
     // const Razorpay = require('razorpay');
     // const instance = new Razorpay({ key_id: keyId, key_secret: keySecret });
     // const order = await instance.orders.create({ amount: amount * 100, currency, receipt, notes });
