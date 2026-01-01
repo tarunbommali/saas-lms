@@ -14,6 +14,16 @@ import {
   verifyOTP,
   checkOTPRateLimit,
 } from '../services/otp.js';
+import { validateBody } from '../middleware/validation.middleware.js';
+import {
+  SignupDTO,
+  LoginDTO,
+  ForgotPasswordDTO,
+  VerifyOtpDTO,
+  ResetPasswordDTO,
+  UpdateProfileDTO,
+  GoogleAuthDTO,
+} from '../dto/index.js';
 
 const router = Router();
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
