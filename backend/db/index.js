@@ -407,6 +407,64 @@ const ensureColumnExists = async (client, tableName, columnName, columnDefinitio
   }
 };
 
+const ensureIndexExists = async (client, tableName, indexName, indexDefinition) => {
+  const [rows] = await client.query(
+    `SELECT INDEX_NAME FROM INFORMATION_SCHEMA.STATISTICS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND INDEX_NAME = ?`,
+    [tableName, indexName]
+  );
+  if (!rows || rows.length === 0) {
+    try {
+      await client.query(`CREATE INDEX ${indexName} ON ${tableName} ${indexDefinition}`);
+      console.log(`✅ Created index ${indexName} on ${tableName}`);
+    } catch (error) {
+      if (!error.message.includes('Duplicate key name')) {
+        console.warn(`⚠️ Could not create index ${indexName} on ${tableName}:`, error.message);
+      }
+    }
+  }
+};
+
+const createPerformanceIndexes = async (client) => {
+  console.log('📊 Creating performance indexes...');
+  
+  // Users table indexes
+  await ensureIndexExists(client, 'users', 'idx_users_email', '(email)');
+  await ensureIndexExists(client, 'users', 'idx_users_is_admin', '(is_admin)');
+  await ensureIndexExists(client, 'users', 'idx_users_is_active', '(is_active)');
+  await ensureIndexExists(client, 'users', 'idx_users_google_id', '(google_id)');
+  
+  // Courses table indexes
+  await ensureIndexExists(client, 'courses', 'idx_courses_is_published', '(is_published)');
+  await ensureIndexExists(client, 'courses', 'idx_courses_category', '(category)');
+  await ensureIndexExists(client, 'courses', 'idx_courses_difficulty', '(difficulty)');
+  await ensureIndexExists(client, 'courses', 'idx_courses_slug', '(slug)');
+  await ensureIndexExists(client, 'courses', 'idx_courses_created_by', '(created_by)');
+  await ensureIndexExists(client, 'courses', 'idx_courses_status', '(status)');
+  
+  // Enrollments table indexes
+  await ensureIndexExists(client, 'enrollments', 'idx_enrollments_user_id', '(user_id)');
+  await ensureIndexExists(client, 'enrollments', 'idx_enrollments_course_id', '(course_id)');
+  await ensureIndexExists(client, 'enrollments', 'idx_enrollments_status', '(status)');
+  await ensureIndexExists(client, 'enrollments', 'idx_enrollments_user_course', '(user_id, course_id)');
+  
+  // Certifications table indexes
+  await ensureIndexExists(client, 'certifications', 'idx_certifications_user_id', '(user_id)');
+  await ensureIndexExists(client, 'certifications', 'idx_certifications_course_id', '(course_id)');
+  await ensureIndexExists(client, 'certifications', 'idx_certifications_status', '(status)');
+  
+  // Payments table indexes
+  await ensureIndexExists(client, 'payments', 'idx_payments_user_id', '(user_id)');
+  await ensureIndexExists(client, 'payments', 'idx_payments_course_id', '(course_id)');
+  await ensureIndexExists(client, 'payments', 'idx_payments_status', '(status)');
+  await ensureIndexExists(client, 'payments', 'idx_payments_order_id', '(order_id)');
+  
+  // Coupons table indexes
+  await ensureIndexExists(client, 'coupons', 'idx_coupons_code', '(code)');
+  await ensureIndexExists(client, 'coupons', 'idx_coupons_is_active', '(is_active)');
+  
+  console.log('✅ Performance indexes created');
+};
+
 const initializeDatabase = async () => {
   const client = connection.promise();
   for (const statement of createTablesStatements) {
