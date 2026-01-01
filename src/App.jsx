@@ -73,13 +73,14 @@ const App = () => {
   return (
     <Router>
       {/* Context Providers (Outer → Inner hierarchy) */}
-      <AuthProvider>
-        <UserProvider>
-          <CourseProvider>
-            <PaymentProvider>
-              <LearnPageProvider>
-                <RealtimeProvider>
-                  <AppLayout>
+      <ToastProvider position="top-right">
+        <AuthProvider>
+          <UserProvider>
+            <CourseProvider>
+              <PaymentProvider>
+                <LearnPageProvider>
+                  <RealtimeProvider>
+                    <AppLayout>
                     <Routes>
                       {/* Public Routes */}
                       <Route path="/" element={<LandingPage />} />
