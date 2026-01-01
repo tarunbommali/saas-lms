@@ -1,98 +1,329 @@
-import { Globe, Briefcase, Computer } from "lucide-react";
-// removed unused lucide-react icons to satisfy linter
+/**
+ * Constants for the application
+ */
 
-export const cardList = [
-  { title: "Industry Ready", icon: Briefcase, subtitle: "Practical Projects" },
-  { title: "Hybrid Mode", icon: Globe, subtitle: "Online & Offline" },
-  { title: "Labs", icon: Computer, subtitle: "Campus Labs" },
+// API Endpoints
+export const API_ENDPOINTS = {
+  // Auth
+  AUTH: {
+    LOGIN: '/auth/login',
+    SIGNUP: '/auth/signup',
+    LOGOUT: '/auth/logout',
+    ME: '/auth/me',
+    FORGOT_PASSWORD: '/auth/forgot-password',
+    RESET_PASSWORD: '/auth/reset-password',
+    GOOGLE: '/auth/google',
+  },
+  
+  // Courses
+  COURSES: {
+    LIST: '/courses',
+    DETAIL: (id) => `/courses/${id}`,
+    CREATE: '/admin/courses',
+    UPDATE: (id) => `/admin/courses/${id}`,
+    DELETE: (id) => `/admin/courses/${id}`,
+    MODULES: (id) => `/courses/${id}/modules`,
+  },
+  
+  // Enrollments
+  ENROLLMENTS: {
+    LIST: '/enrollments',
+    CREATE: '/enrollments',
+    MY_ENROLLMENTS: '/enrollments/my-enrollments',
+    DETAIL: (id) => `/enrollments/${id}`,
+  },
+  
+  // Payments
+  PAYMENTS: {
+    LIST: '/payments',
+    CREATE: '/payments',
+    MY_PAYMENTS: '/payments/my-payments',
+    UPDATE: (id) => `/payments/${id}`,
+  },
+  
+  // Certifications
+  CERTIFICATIONS: {
+    LIST: '/admin/certifications',
+    CREATE: '/admin/certifications',
+    DETAIL: (id) => `/admin/certifications/${id}`,
+    UPDATE: (id) => `/admin/certifications/${id}`,
+    DELETE: (id) => `/admin/certifications/${id}`,
+  },
+  
+  // Coupons
+  COUPONS: {
+    LIST: '/admin/coupons',
+    CREATE: '/admin/coupons',
+    VALIDATE: '/coupons/validate',
+    UPDATE: (id) => `/admin/coupons/${id}`,
+    DELETE: (id) => `/admin/coupons/${id}`,
+  },
+  
+  // Users
+  USERS: {
+    LIST: '/admin/users',
+    DETAIL: (id) => `/admin/users/${id}`,
+    UPDATE: (id) => `/admin/users/${id}`,
+    DELETE: (id) => `/admin/users/${id}`,
+  },
+  
+  // Progress
+  PROGRESS: {
+    GET: (courseId) => `/progress/${courseId}`,
+    UPDATE: (courseId) => `/progress/${courseId}`,
+  },
+};
+
+// User Roles
+export const USER_ROLES = {
+  ADMIN: 'admin',
+  USER: 'user',
+};
+
+// Course Difficulty Levels
+export const DIFFICULTY_LEVELS = {
+  BEGINNER: 'beginner',
+  INTERMEDIATE: 'intermediate',
+  ADVANCED: 'advanced',
+};
+
+// Course Categories
+export const COURSE_CATEGORIES = [
+  'Web Development',
+  'Mobile Development',
+  'Data Science',
+  'Machine Learning',
+  'Artificial Intelligence',
+  'Cloud Computing',
+  'Cybersecurity',
+  'DevOps',
+  'Blockchain',
+  'Game Development',
+  'UI/UX Design',
+  'Digital Marketing',
+  'Business',
+  'Other',
 ];
 
-export const DISCORD_SERVER_URL = "https://discord.gg/E9dckgdNKw";
+// Payment Status
+export const PAYMENT_STATUS = {
+  PENDING: 'pending',
+  COMPLETED: 'completed',
+  FAILED: 'failed',
+  REFUNDED: 'refunded',
+};
 
-export const website = "http://nxtgencertificationbyjntugv.com";
+// Certification Status
+export const CERTIFICATION_STATUS = {
+  PENDING: 'PENDING',
+  ISSUED: 'ISSUED',
+  REVOKED: 'REVOKED',
+};
 
-export const capstoneProjects = [
-  {
-    title: "Smart Health Prediction System",
-    imageUrl:
-      "http://greaterkashmir.imagibyte.sortdcdn.net/wp-content/uploads/2023/08/smartphone_gd68cdcc68_1920.png",
-    description: "ML model + IoT vitals data",
-  },
-  {
-    title: "AI Chatbot with Sentiment Analysis",
-    imageUrl:
-      "http://chatgen.ai/wp-content/uploads/2023/04/AI-chat-5-1200x675.png",
-    description: "NLP + Deep Learning integration",
-  },
-  {
-    title: "Autonomous Irrigation System",
-    imageUrl:
-      "http://hashstudioz.com/images/dashboard/irrigation-management-dashboard-1.webp",
-    description: "Predict crop water needs (IoT + ML)",
-  },
-  {
-    title: "Cyber Threat Detection",
-    imageUrl:
-      "http://slideteam.net/wp/wp-content/uploads/2022/12/Dashboard-for-Threat-Tracking-in-Cyber-Security.png",
-    description: "Network log classification using ML",
-  },
-  {
-    title: "Quantum-Enhanced Classifier",
-    imageUrl:
-      "https://physics.aps.org/assets/63cae50d-acbd-427d-93c7-a2876b30390c/e79_2.png",
-    description: "Compare classical vs quantum ML",
-  },
-  {
-    title: "Emotion Detection from Images",
-    imageUrl:
-      "https://visagetechnologies.com/app/uploads/2023/05/Emotion-AI-picture-2-copy.webp",
-    description: "CNN-based Deep Learning model",
-  },
-  {
-    title: "Stock Price Prediction",
-    imageUrl:
-      "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQW13FKI087t-Qv5JaeEatuiiAEHyqt_34o020U3FA7NYyfGQuqmgS68LtxDhvjoCjLM9k&usqp=CAU",
-    description: "LSTM with time-series data",
-  },
-  {
-    title: "Fake News Detection",
-    imageUrl:
-      "https://cdn.labmanager.com/assets/articleNo/477/iImg/858/039150cb-8848-45d5-898f-c9b50e1120bd-nov18-2019-pennstate-istock-fakenews-640x360.png",
-    description: "NLP + Classification pipeline",
-  },
-  {
-    title: "E-commerce Recommender System",
-    imageUrl:
-      "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTLLQx6PRUml8r0I6ZsEiIDFBtYlKDKNUdEbg&s",
-    description: "Collaborative filtering using ML",
-  },
-  {
-    title: "Disease Diagnosis Assistant",
-    imageUrl:
-      "https://www.sermo.com/wp-content/uploads/2025/03/seo-blog-header-ai-superhuman-calculator.png",
-    description: "ML + Raspberry Pi health sensors",
-  },
+// Enrollment Status
+export const ENROLLMENT_STATUS = {
+  ACTIVE: 'active',
+  COMPLETED: 'completed',
+  EXPIRED: 'expired',
+  CANCELLED: 'cancelled',
+};
+
+// Gender Options
+export const GENDER_OPTIONS = [
+  { value: 'male', label: 'Male' },
+  { value: 'female', label: 'Female' },
+  { value: 'other', label: 'Other' },
+  { value: 'prefer_not_to_say', label: 'Prefer not to say' },
 ];
 
-export const testimonials = [
-  {
-    name: "Priya Reddy",
-    image:
-      "https://img.freepik.com/premium-photo/young-smiling-indian-female-student_776674-1120363.jpg",
-    text: "The Emerging Technologies course by JNTU-GV is amazing! It helped me understand AI, IoT, and Cybersecurity in a simple and practical way. Highly recommended for beginners.",
-  },
-  {
-    name: "Tarun Bommali",
-    image:
-      "https://res.cloudinary.com/drdgj0pch/image/upload/v1730514872/Screenshot_2024-11-02_080335_zokmgr.png",
-    text: "Hands-on projects and peer discussions helped me gain real-world skills. The instructors are supportive and knowledgeable.",
-  },
-  {
-    name: "MOHAMMED SHAIK",
-    image:
-      "https://media.licdn.com/dms/image/v2/D5603AQF9rSl1bARhZQ/profile-displayphoto-crop_800_800/B56Zh_GE2gHUAM-/0/1754478988567?e=1759968000&v=beta&t=DwUAq-rHtiL8DFYHM819NsbcUDa4SBVXDfLVW8uW--8",
-    text: "Joining the course was the best decision. The community is vibrant, and the content is very well structured.",
-  },
-];
+// Content Types
+export const CONTENT_TYPES = {
+  VIDEO: 'video',
+  DOCUMENT: 'document',
+  QUIZ: 'quiz',
+  ASSIGNMENT: 'assignment',
+  EXTERNAL: 'external',
+};
 
+// Currency
+export const CURRENCY = {
+  CODE: 'INR',
+  SYMBOL: '₹',
+};
 
+// Date Formats
+export const DATE_FORMATS = {
+  SHORT: 'short',
+  LONG: 'long',
+  FULL: 'full',
+  TIME: 'time',
+  DATETIME: 'datetime',
+};
+
+// Toast Types
+export const TOAST_TYPES = {
+  SUCCESS: 'success',
+  ERROR: 'error',
+  WARNING: 'warning',
+  INFO: 'info',
+};
+
+// Modal Sizes
+export const MODAL_SIZES = {
+  SM: 'sm',
+  MD: 'md',
+  LG: 'lg',
+  XL: 'xl',
+  FULL: 'full',
+};
+
+// Button Variants
+export const BUTTON_VARIANTS = {
+  PRIMARY: 'primary',
+  SECONDARY: 'secondary',
+  OUTLINE: 'outline',
+  GHOST: 'ghost',
+  LINK: 'link',
+  DESTRUCTIVE: 'destructive',
+  SUCCESS: 'success',
+};
+
+// Button Sizes
+export const BUTTON_SIZES = {
+  SM: 'sm',
+  MD: 'md',
+  LG: 'lg',
+  ICON: 'icon',
+};
+
+// Loading States
+export const LOADING_STATES = {
+  IDLE: 'idle',
+  LOADING: 'loading',
+  SUCCESS: 'success',
+  ERROR: 'error',
+};
+
+// Pagination
+export const PAGINATION = {
+  DEFAULT_PAGE_SIZE: 10,
+  PAGE_SIZE_OPTIONS: [10, 20, 50, 100],
+};
+
+// File Upload
+export const FILE_UPLOAD = {
+  MAX_FILE_SIZE: 10 * 1024 * 1024, // 10MB
+  ALLOWED_IMAGE_TYPES: ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'],
+  ALLOWED_VIDEO_TYPES: ['video/mp4', 'video/webm', 'video/ogg'],
+  ALLOWED_DOCUMENT_TYPES: [
+    'application/pdf',
+    'application/msword',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  ],
+};
+
+// Regex Patterns
+export const REGEX_PATTERNS = {
+  EMAIL: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
+  PHONE: /^[+]?[(]?[0-9]{1,4}[)]?[-\s.]?[(]?[0-9]{1,4}[)]?[-\s.]?[0-9]{1,9}$/,
+  URL: /^(https?:\/\/)?(www\.)?[-a-zA-Z0-9@:%._+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b([-a-zA-Z0-9()@:%_+.~#?&//=]*)$/,
+  PASSWORD: /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)[a-zA-Z\d@$!%*?&]{8,}$/,
+  ALPHANUMERIC: /^[a-zA-Z0-9]+$/,
+  NUMERIC: /^[0-9]+$/,
+  ALPHABETIC: /^[a-zA-Z]+$/,
+};
+
+// Error Messages
+export const ERROR_MESSAGES = {
+  GENERIC: 'An error occurred. Please try again.',
+  NETWORK: 'Network error. Please check your internet connection.',
+  UNAUTHORIZED: 'You need to sign in to continue.',
+  FORBIDDEN: 'You do not have permission to perform this action.',
+  NOT_FOUND: 'The requested resource was not found.',
+  SERVER_ERROR: 'Server error. Please try again later.',
+  VALIDATION: 'Please check your input and try again.',
+  TIMEOUT: 'Request timeout. Please try again.',
+};
+
+// Success Messages
+export const SUCCESS_MESSAGES = {
+  GENERIC: 'Operation completed successfully.',
+  CREATED: 'Created successfully.',
+  UPDATED: 'Updated successfully.',
+  DELETED: 'Deleted successfully.',
+  SAVED: 'Saved successfully.',
+  SENT: 'Sent successfully.',
+};
+
+// Routes
+export const ROUTES = {
+  HOME: '/',
+  COURSES: '/courses',
+  COURSE_DETAIL: (id) => `/course/${id}`,
+  LEARN: (id) => `/learn/${id}`,
+  CHECKOUT: (id) => `/checkout/${id}`,
+  PROFILE: '/profile',
+  PROFILE_EDIT: '/profile/edit',
+  SIGNIN: '/auth/signin',
+  SIGNUP: '/auth/signup',
+  FORGOT_PASSWORD: '/auth/forgot-password',
+  ADMIN: '/admin',
+  ADMIN_COURSES: '/admin/courses',
+  ADMIN_USERS: '/admin/users',
+  ADMIN_ENROLLMENTS: '/admin/enrollments',
+  ADMIN_CERTIFICATIONS: '/admin/certifications',
+  ADMIN_COUPONS: '/admin/coupons',
+  ADMIN_ANALYTICS: '/admin/analytics',
+};
+
+// Local Storage Keys
+export const STORAGE_KEYS = {
+  AUTH_TOKEN: 'jntugv_auth_token',
+  USER: 'jntugv_user',
+  THEME: 'jntugv_theme',
+  LANGUAGE: 'jntugv_language',
+};
+
+// Theme
+export const THEMES = {
+  LIGHT: 'light',
+  DARK: 'dark',
+  SYSTEM: 'system',
+};
+
+// Breakpoints (Tailwind default)
+export const BREAKPOINTS = {
+  SM: 640,
+  MD: 768,
+  LG: 1024,
+  XL: 1280,
+  '2XL': 1536,
+};
+
+export default {
+  API_ENDPOINTS,
+  USER_ROLES,
+  DIFFICULTY_LEVELS,
+  COURSE_CATEGORIES,
+  PAYMENT_STATUS,
+  CERTIFICATION_STATUS,
+  ENROLLMENT_STATUS,
+  GENDER_OPTIONS,
+  CONTENT_TYPES,
+  CURRENCY,
+  DATE_FORMATS,
+  TOAST_TYPES,
+  MODAL_SIZES,
+  BUTTON_VARIANTS,
+  BUTTON_SIZES,
+  LOADING_STATES,
+  PAGINATION,
+  FILE_UPLOAD,
+  REGEX_PATTERNS,
+  ERROR_MESSAGES,
+  SUCCESS_MESSAGES,
+  ROUTES,
+  STORAGE_KEYS,
+  THEMES,
+  BREAKPOINTS,
+};
