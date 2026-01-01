@@ -7,7 +7,7 @@ export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '')
   const pid = env.VITE_FIREBASE_PROJECT_ID
   const functionsProxyTarget = env.VITE_FUNCTIONS_PROXY_TARGET || (pid ? `https://us-central1-${pid}.cloudfunctions.net` : undefined)
-  const backendProxyTarget = env.VITE_DEV_BACKEND_TARGET || env.VITE_BACKEND_URL || 'http://localhost:3000'
+  const backendProxyTarget = env.VITE_DEV_BACKEND_TARGET || env.VITE_BACKEND_URL || 'http://localhost:8001'
 
   const proxy = {}
 
