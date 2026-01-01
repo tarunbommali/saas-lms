@@ -615,14 +615,46 @@ router.post('/:quizId/submit', authenticateToken, async (req, res) => {
     
     // Update module progress if quiz is associated with a module
     if (quiz.moduleId && passed) {
-      await db.update(userModuleProgress).set({
-        quizScore: score,
-        quizPassed: true,
-        quizAttempts: sql`quiz_attempts + 1`,
-      }).where(and(
-        eq(userModuleProgress.userId, userId),
-        eq(userModuleProgress.moduleId, quiz.moduleId)
-      ));
+      // Check if progress record exists
+      const [existingProgress] = await db
+        .select()
+        .from(userModuleProgress)
+        .where(and(
+          eq(userModuleProgress.userId, userId),
+          eq(userModuleProgress.moduleId, quiz.moduleId)
+        ));
+      
+      if (existingProgress) {
+        // Update existing record
+        await db.update(userModuleProgress).set({
+          quizScore: score,
+          quizPassed: true,
+          quizAttempts: (existingProgress.quizAttempts || 0) + 1,
+          isCompleted: true,
+          completedAt: new Date(),
+          status: 'completed',
+          progressPercentage: 100,
+        }).where(eq(userModuleProgress.id, existingProgress.id));
+      } else {
+        // Create new progress record
+        const progressId = randomUUID();
+        await db.insert(userModuleProgress).values({
+          id: progressId,
+          userId,
+          courseId: quiz.courseId,
+          moduleId: quiz.moduleId,
+          enrollmentId: attempt.enrollmentId,
+          status: 'completed',
+          progressPercentage: 100,
+          isUnlocked: true,
+          isCompleted: true,
+          completedAt: new Date(),
+          lastAccessedAt: new Date(),
+          quizScore: score,
+          quizPassed: true,
+          quizAttempts: 1,
+        });
+      }
     }
     
     const [updatedAttempt] = await db.select().from(quizAttempts).where(eq(quizAttempts.id, attemptId));
