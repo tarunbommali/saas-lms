@@ -35,7 +35,7 @@ async function main() {
     console.error('');
     console.error('Examples:');
     console.error('  EMAIL=user@example.com node scripts/grant-admin.mjs');
-    console.error('  UID=12345678-1234-1234-1234-123456789abc node scripts/grant-admin.mjs');
+    console.error('  UID=cert-system-upgrade node scripts/grant-admin.mjs');
     process.exit(1);
   }
 
