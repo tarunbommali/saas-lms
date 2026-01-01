@@ -437,4 +437,292 @@ router.delete('/:id', requireAdmin, async (req, res) => {
   }
 });
 
+/**
+ * Generate and download certificate PDF
+ * GET /api/certifications/:id/pdf
+ */
+router.get('/:id/pdf', async (req, res) => {
+  try {
+    const certificationId = req.params.id;
+    
+    // Get certification with user and course data
+    const [certRecord] = await db
+      .select()
+      .from(certifications)
+      .where(eq(certifications.id, certificationId))
+      .limit(1);
+
+    if (!certRecord) {
+      return res.status(404).json({ error: 'Certification not found' });
+    }
+
+    // Security check: Must be owner or admin
+    if (certRecord.userId !== req.user.id && !req.user.isAdmin) {
+      return res.status(403).json({ error: 'Not authorized to download this certificate' });
+    }
+
+    // Only allow download of ISSUED certificates
+    if (certRecord.status !== 'ISSUED') {
+      return res.status(400).json({ error: 'Certificate has not been issued yet' });
+    }
+
+    // Get user details
+    const [certUser] = await db
+      .select()
+      .from(users)
+      .where(eq(users.id, certRecord.userId))
+      .limit(1);
+
+    // Get course details
+    const [course] = await db
+      .select()
+      .from(courses)
+      .where(eq(courses.id, certRecord.courseId))
+      .limit(1);
+
+    // Extract metadata
+    const metadata = toObject(certRecord.metadata);
+    const studentName = certUser?.displayName || certUser?.firstName 
+      ? `${certUser.firstName || ''} ${certUser.lastName || ''}`.trim()
+      : metadata.recipientName || 'Student';
+    const courseName = course?.title || metadata.courseTitle || metadata.courseName || 'Course';
+    const instructor = course?.instructor || metadata.instructor || 'JNTU-GV Faculty';
+    const completionDate = certRecord.issuedAt || certRecord.createdAt || new Date();
+    const score = certRecord.overallScore || metadata.score || null;
+    const grade = metadata.grade || scoreToGrade(score);
+
+    // Generate PDF
+    const pdfBuffer = await generateCertificatePDF({
+      certificateId: certificationId,
+      studentName,
+      courseName,
+      completionDate,
+      instructor,
+      score,
+      grade,
+      duration: course?.duration || metadata.duration || null,
+    });
+
+    // Set response headers for PDF download
+    const sanitizedName = studentName.replace(/[^a-zA-Z0-9\s]/g, '').replace(/\s+/g, '_');
+    const fileName = `JNTUGV_Certificate_${sanitizedName}.pdf`;
+    
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
+    res.setHeader('Content-Length', pdfBuffer.length);
+    
+    res.send(pdfBuffer);
+  } catch (error) {
+    console.error('Generate PDF error:', error);
+    res.status(500).json({ error: 'Failed to generate certificate PDF' });
+  }
+});
+
+/**
+ * Helper: Convert score to grade
+ */
+const scoreToGrade = (score) => {
+  const numericScore = Number(score ?? 0);
+  if (Number.isNaN(numericScore) || numericScore === 0) return 'Pass';
+  if (numericScore >= 90) return 'Excellent';
+  if (numericScore >= 75) return 'Very Good';
+  if (numericScore >= 60) return 'Good';
+  return 'Pass';
+};
+
+/**
+ * Helper: Format date for certificate
+ */
+const formatCertDate = (date) => {
+  const d = new Date(date);
+  const options = { year: 'numeric', month: 'long', day: 'numeric' };
+  return d.toLocaleDateString('en-US', options);
+};
+
+/**
+ * Generate Certificate PDF using PDFKit
+ */
+const generateCertificatePDF = async ({
+  certificateId,
+  studentName,
+  courseName,
+  completionDate,
+  instructor,
+  score,
+  grade,
+  duration,
+}) => {
+  return new Promise((resolve, reject) => {
+    try {
+      const doc = new PDFDocument({
+        size: 'A4',
+        layout: 'landscape',
+        margins: { top: 40, bottom: 40, left: 50, right: 50 },
+        info: {
+          Title: `Certificate - ${courseName}`,
+          Author: 'JNTU-GV NxtGen Certification',
+          Subject: 'Course Completion Certificate',
+        },
+      });
+
+      const chunks = [];
+      doc.on('data', (chunk) => chunks.push(chunk));
+      doc.on('end', () => resolve(Buffer.concat(chunks)));
+      doc.on('error', reject);
+
+      const pageWidth = doc.page.width;
+      const pageHeight = doc.page.height;
+
+      // Background
+      doc.rect(0, 0, pageWidth, pageHeight).fill('#FAFBFC');
+      
+      // Decorative border - JNTU-GV blue
+      doc.rect(20, 20, pageWidth - 40, pageHeight - 40)
+        .lineWidth(8)
+        .stroke('#004080');
+      
+      // Inner gold accent border
+      doc.rect(30, 30, pageWidth - 60, pageHeight - 60)
+        .lineWidth(2)
+        .stroke('#D4AF37');
+
+      // Corner decorations
+      const corners = [
+        { x: 40, y: 40 },
+        { x: pageWidth - 70, y: 40 },
+        { x: 40, y: pageHeight - 70 },
+        { x: pageWidth - 70, y: pageHeight - 70 },
+      ];
+      corners.forEach(({ x, y }) => {
+        doc.rect(x, y, 30, 30).lineWidth(1).stroke('#D4AF37');
+      });
+
+      // Header
+      let yPos = 60;
+      doc.fontSize(16)
+        .font('Helvetica-Bold')
+        .fillColor('#004080')
+        .text('JNTU-GV', 0, yPos, { align: 'center' });
+      
+      yPos += 20;
+      doc.fontSize(10)
+        .font('Helvetica')
+        .fillColor('#666666')
+        .text('Jawaharlal Nehru Technological University - Gurajada Vishakhapatnam', 0, yPos, { align: 'center' });
+
+      // Certificate Title
+      yPos += 45;
+      doc.fontSize(38)
+        .font('Helvetica-Bold')
+        .fillColor('#004080')
+        .text('CERTIFICATE', 0, yPos, { align: 'center' });
+      
+      yPos += 45;
+      doc.fontSize(18)
+        .font('Helvetica')
+        .fillColor('#666666')
+        .text('OF COMPLETION', 0, yPos, { align: 'center' });
+
+      // Decorative line
+      yPos += 30;
+      const lineWidth = 200;
+      doc.moveTo((pageWidth - lineWidth) / 2, yPos)
+        .lineTo((pageWidth + lineWidth) / 2, yPos)
+        .lineWidth(2)
+        .stroke('#D4AF37');
+
+      // Main content
+      yPos += 25;
+      doc.fontSize(14)
+        .font('Helvetica')
+        .fillColor('#333333')
+        .text('This is to certify that', 0, yPos, { align: 'center' });
+
+      // Student Name
+      yPos += 30;
+      doc.fontSize(28)
+        .font('Helvetica-Bold')
+        .fillColor('#004080')
+        .text(studentName, 0, yPos, { align: 'center' });
+
+      // Underline for name
+      yPos += 35;
+      const nameWidth = 300;
+      doc.moveTo((pageWidth - nameWidth) / 2, yPos)
+        .lineTo((pageWidth + nameWidth) / 2, yPos)
+        .lineWidth(1)
+        .stroke('#D4AF37');
+
+      yPos += 15;
+      doc.fontSize(14)
+        .font('Helvetica')
+        .fillColor('#333333')
+        .text('has successfully completed the course', 0, yPos, { align: 'center' });
+
+      // Course Name
+      yPos += 30;
+      doc.fontSize(22)
+        .font('Helvetica-Bold')
+        .fillColor('#004080')
+        .text(`"${courseName}"`, 0, yPos, { align: 'center' });
+
+      // Course details
+      yPos += 35;
+      let detailsText = `Completed on: ${formatCertDate(completionDate)}`;
+      if (duration) detailsText += `  |  Duration: ${duration} hours`;
+      if (score !== null && score > 0) detailsText += `  |  Score: ${score}%`;
+      
+      doc.fontSize(11)
+        .font('Helvetica')
+        .fillColor('#666666')
+        .text(detailsText, 0, yPos, { align: 'center' });
+
+      // Signature section
+      yPos += 55;
+      
+      // Left signature (Instructor)
+      const leftX = 150;
+      doc.moveTo(leftX, yPos).lineTo(leftX + 150, yPos).lineWidth(1).stroke('#333333');
+      doc.fontSize(12)
+        .font('Helvetica-Bold')
+        .fillColor('#333333')
+        .text(instructor, leftX, yPos + 10, { width: 150, align: 'center' });
+      doc.fontSize(10)
+        .font('Helvetica')
+        .fillColor('#666666')
+        .text('Course Instructor', leftX, yPos + 25, { width: 150, align: 'center' });
+
+      // Right signature (Director)
+      const rightX = pageWidth - 300;
+      doc.moveTo(rightX, yPos).lineTo(rightX + 150, yPos).lineWidth(1).stroke('#333333');
+      doc.fontSize(12)
+        .font('Helvetica-Bold')
+        .fillColor('#333333')
+        .text('Dr. A. Srinivasa Rao', rightX, yPos + 10, { width: 150, align: 'center' });
+      doc.fontSize(10)
+        .font('Helvetica')
+        .fillColor('#666666')
+        .text('Director, JNTU-GV', rightX, yPos + 25, { width: 150, align: 'center' });
+
+      // Footer
+      yPos = pageHeight - 75;
+      doc.fontSize(9)
+        .font('Helvetica')
+        .fillColor('#888888')
+        .text(`Certificate ID: ${certificateId}`, 60, yPos, { align: 'left' });
+      
+      doc.text(`Grade: ${grade}`, pageWidth - 150, yPos, { align: 'right' });
+
+      yPos += 15;
+      doc.fontSize(8)
+        .fillColor('#666666')
+        .text('Verify this certificate at: https://certification.jntugv.edu.in/verify', 0, yPos, { align: 'center' });
+
+      doc.end();
+    } catch (error) {
+      reject(error);
+    }
+  });
+};
+
 export default router;
