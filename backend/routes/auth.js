@@ -7,7 +7,13 @@ import { db } from '../db/index.js';
 import { users } from '../db/schema.js';
 import { eq } from 'drizzle-orm';
 import { generateToken, authenticateToken } from '../middleware/auth.js';
-import { sendOtpEmail } from '../services/email.js';
+import { sendOtpEmail, sendWelcomeEmail } from '../services/email.js';
+import {
+  generateOTPWithExpiry,
+  hashOTP,
+  verifyOTP,
+  checkOTPRateLimit,
+} from '../services/otp.js';
 
 const router = Router();
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
