@@ -223,7 +223,7 @@ router.post('/forgot-password', validateBody(ForgotPasswordDTO), async (req, res
 });
 
 // Verify OTP endpoint
-router.post('/verify-otp', async (req, res) => {
+router.post('/verify-otp', validateBody(VerifyOtpDTO), async (req, res) => {
   try {
     const { email, otp } = req.body;
 
