@@ -46,6 +46,21 @@ app.use("/api/", limiter);
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+// Root route - Welcome message
+app.get("/", (req, res) => {
+  res.json({
+    success: true,
+    message: "Welcome to JNTU-GV Certification Platform API",
+    version: "2.0.0",
+    documentation: `${BASE_URL}/api/health`,
+    endpoints: {
+      health: `${BASE_URL}/api/health`,
+      auth: `${BASE_URL}/api/auth`,
+      courses: `${BASE_URL}/api/courses`,
+    },
+  });
+});
+
 
 app.get("/api/health", (req, res) => {
   const apiList = {
