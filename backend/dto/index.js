@@ -6,6 +6,55 @@
 import { z } from 'zod';
 
 /**
+ * Auth DTOs
+ */
+export const SignupDTO = z.object({
+  email: z.string().email('Invalid email address'),
+  password: z.string().min(8, 'Password must be at least 8 characters'),
+  firstName: z.string().min(1).max(100).optional(),
+  lastName: z.string().min(1).max(100).optional(),
+  displayName: z.string().min(1).max(200).optional(),
+});
+
+export const LoginDTO = z.object({
+  email: z.string().email('Invalid email address'),
+  password: z.string().min(1, 'Password is required'),
+});
+
+export const ForgotPasswordDTO = z.object({
+  email: z.string().email('Invalid email address'),
+});
+
+export const VerifyOtpDTO = z.object({
+  email: z.string().email('Invalid email address'),
+  otp: z.string().min(4).max(8),
+});
+
+export const ResetPasswordDTO = z.object({
+  token: z.string().min(1, 'Reset token is required'),
+  newPassword: z.string().min(8, 'Password must be at least 8 characters').optional(),
+  password: z.string().min(8, 'Password must be at least 8 characters').optional(),
+}).refine(data => data.newPassword || data.password, {
+  message: 'New password is required',
+});
+
+export const UpdateProfileDTO = z.object({
+  firstName: z.string().min(1).max(100).optional(),
+  lastName: z.string().min(1).max(100).optional(),
+  displayName: z.string().min(1).max(200).optional(),
+  phone: z.string().max(32).optional(),
+  college: z.string().max(191).optional(),
+  gender: z.string().max(32).optional(),
+  dateOfBirth: z.string().datetime().optional().or(z.date()).optional(),
+  skills: z.array(z.string()).optional(),
+  interests: z.array(z.string()).optional(),
+});
+
+export const GoogleAuthDTO = z.object({
+  credential: z.string().min(1, 'Google credential is required'),
+});
+
+/**
  * Module DTOs
  */
 export const CreateModuleDTO = z.object({
