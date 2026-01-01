@@ -40,7 +40,7 @@ const sanitizeUser = (user) => {
 
 const normalizeEmail = (email) => (email ? email.trim().toLowerCase() : email);
 
-router.post('/signup', async (req, res) => {
+router.post('/signup', validateBody(SignupDTO), async (req, res) => {
   try {
     const { email, password, firstName, lastName, displayName } = req.body;
 
