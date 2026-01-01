@@ -284,6 +284,7 @@ const App = () => {
           </CourseProvider>
         </UserProvider>
       </AuthProvider>
+      </ToastProvider>
     </Router>
   );
 };
