@@ -33,17 +33,22 @@ const getBaseUrl = () => {
       return stripTrailingSlash(window.__APP_API_URL__);
     }
 
+    // In development, use relative /api path so Vite proxy handles it
+    // The proxy is configured in vite.config.js to forward to backend
+    if (import.meta.env?.DEV) {
+      return '/api';
+    }
+
     const isLocalhost = ['localhost', '127.0.0.1', '::1'].includes(window.location.hostname);
     if (isLocalhost) {
-      const protocol = window.location.protocol || 'http:';
-      const devPort = import.meta.env?.VITE_DEV_API_PORT?.trim() || '3000';
-      return `${protocol}//${window.location.hostname}:${devPort}/api`;
+      // Use relative path for localhost to work with proxy
+      return '/api';
     }
 
     return stripTrailingSlash(`${window.location.origin}/api`);
   }
 
-  return 'http://localhost:3000/api';
+  return '/api';
 };
 
 const buildUrl = (path) => {
