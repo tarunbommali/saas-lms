@@ -1,10 +1,13 @@
 /* eslint-disable no-console */
-import 'dotenv/config';
+import dotenv from 'dotenv';
 import mysql from 'mysql2';
 import { drizzle } from 'drizzle-orm/mysql2';
 import bcrypt from 'bcryptjs';
 import { randomUUID } from 'crypto';
 import * as schema from './schema.js';
+
+// Load environment variables
+dotenv.config();
 
 const {
   DB_HOST = 'localhost',
