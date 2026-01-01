@@ -138,6 +138,16 @@ router.post('/forgot-password', async (req, res) => {
     }
 
     const normalizedEmail = normalizeEmail(email);
+
+    // Check rate limit
+    const rateLimit = checkOTPRateLimit(normalizedEmail, 3, 15);
+    if (!rateLimit.allowed) {
+      return res.status(429).json({
+        error: rateLimit.error,
+        resetTime: rateLimit.resetTime,
+      });
+    }
+
     const [user] = await db
       .select()
       .from(users)
@@ -146,22 +156,20 @@ router.post('/forgot-password', async (req, res) => {
 
     // Always return success message to prevent email enumeration
     const genericResponse = {
-      message: 'If an account exists for the supplied email, a 4-digit OTP has been sent.',
+      message: 'If an account exists with this email, an OTP has been sent.',
       success: true,
+      remaining: rateLimit.remaining,
     };
 
     if (!user || user.isActive === false) {
       return res.json(genericResponse);
     }
 
-    // Generate 4-digit OTP
-    const otp = Math.floor(1000 + Math.random() * 9000).toString();
+    // Generate secure OTP with expiry
+    const { otp, expiresAt, expiryMinutes } = generateOTPWithExpiry(10);
 
-    // Hash the OTP for storage (security)
-    const hashedOtp = createHash('sha256').update(otp).digest('hex');
-
-    // OTP expires in 5 minutes
-    const expiresAt = new Date(Date.now() + 5 * 60 * 1000);
+    // Hash the OTP for secure storage
+    const hashedOtp = hashOTP(otp);
 
     await db
       .update(users)
@@ -174,13 +182,13 @@ router.post('/forgot-password', async (req, res) => {
       .execute();
 
     // Send OTP via email
-    const emailResult = await sendOtpEmail(user.email, otp, 5);
+    const emailResult = await sendOtpEmail(user.email, otp, expiryMinutes);
 
     if (emailResult.success) {
       console.log(`[OTP] Email sent successfully to ${user.email}`);
     } else if (emailResult.skipped) {
       console.warn(`[OTP] Email service not configured. OTP for ${email}: ${otp}`);
-      // In development or when email is not configured, show OTP in response
+      // In development, show OTP in response when email is not configured
       if (process.env.NODE_ENV !== 'production') {
         genericResponse.otp = otp;
         genericResponse.expiresAt = expiresAt.toISOString();
@@ -188,13 +196,13 @@ router.post('/forgot-password', async (req, res) => {
       }
     } else {
       console.error(`[OTP] Failed to send email: ${emailResult.message}`);
-      // Still return success to prevent enumeration, but log the error
     }
 
     // Always show OTP in development mode for testing
-    if (process.env.NODE_ENV !== 'production') {
+    if (process.env.NODE_ENV === 'development') {
       genericResponse.otp = otp;
       genericResponse.expiresAt = expiresAt.toISOString();
+      console.log(`\n🔐 Development OTP for ${email}: ${otp}\n`);
     }
 
     res.json(genericResponse);
