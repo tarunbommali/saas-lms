@@ -306,8 +306,8 @@ class APITester:
         response = self.session.post(f"{API_BASE}/auth/google", json={
             "credential": "invalid_token"
         })
-        # This should return 500 since Google OAuth is not configured
-        self.assert_response(response, 500, "Google Auth - Not Configured")
+        # This should return 401 for invalid credential
+        self.assert_response(response, 401, "Google Auth - Invalid Credential")
 
     def test_courses_list(self):
         """Test courses listing"""
