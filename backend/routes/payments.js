@@ -2,9 +2,17 @@
 import { Router } from 'express';
 import { randomUUID } from 'crypto';
 import { db } from '../db/index.js';
-import { payments } from '../db/schema.js';
+import { payments, courses, enrollments } from '../db/schema.js';
 import { and, eq, desc } from 'drizzle-orm';
 import { authenticateToken, requireAdmin } from '../middleware/auth.js';
+import { asyncHandler } from '../middleware/errorHandler.js';
+import {
+  createRazorpayOrder,
+  verifyRazorpaySignature,
+  calculateOrderAmount,
+  generateReceiptId,
+  validatePaymentData,
+} from '../services/payment.js';
 
 const router = Router();
 
