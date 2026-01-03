@@ -51,9 +51,9 @@ export default defineConfig(({ mode }) => {
             ],
             // UI components
             ui: [
-              './src/components/Header.jsx',
-              './src/components/Footer.jsx',
-              './src/components/Course/CourseCard.jsx'
+              './src/components/layout/Header.jsx',
+              './src/components/layout/Footer.jsx',
+              './src/components/features/Course/CourseCard.jsx'
             ]
           }
         }

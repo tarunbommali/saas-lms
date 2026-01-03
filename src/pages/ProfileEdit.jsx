@@ -4,7 +4,7 @@ import { useAuth } from "../contexts/AuthContext.jsx";
 import { useNavigate } from "react-router-dom";
 import PageContainer from "../components/layout/PageContainer.jsx";
 import PageTitle from "../components/ui/PageTitle.jsx";
-import ProfileForm from "../components/Profile/ProfileForm.jsx";
+import ProfileForm from "../components/features/Profile/ProfileForm.jsx";
 
 const items = [
   { label: "Home", link: "/" },
@@ -80,9 +80,9 @@ const ProfileEdit = () => {
         // Convert comma-separated string back to array, removing empty values
         skills: form.skills
           ? form.skills
-              .split(",")
-              .map((s) => s.trim())
-              .filter(Boolean)
+            .split(",")
+            .map((s) => s.trim())
+            .filter(Boolean)
           : [],
         socialLinks: form.socialLinks,
       };
@@ -138,14 +138,12 @@ const ProfileEdit = () => {
           value={value || ""}
           onChange={onChange}
           disabled={disabled}
-          className={`block w-full rounded-lg border-gray-300 ${
-            Icon ? "pl-10" : "pl-4"
-          } pr-4 py-2.5 
-                                ${
-                                  disabled
-                                    ? "bg-gray-100 cursor-not-allowed"
-                                    : "focus:border-indigo-500 focus:ring-indigo-500 border"
-                                } 
+          className={`block w-full rounded-lg border-gray-300 ${Icon ? "pl-10" : "pl-4"
+            } pr-4 py-2.5 
+                                ${disabled
+              ? "bg-gray-100 cursor-not-allowed"
+              : "focus:border-indigo-500 focus:ring-indigo-500 border"
+            } 
                                 text-gray-900 placeholder-gray-400 sm:text-sm transition-colors duration-150`}
           placeholder={label}
         />

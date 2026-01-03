@@ -7,8 +7,8 @@ import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 // ----------------------------
 import AppLayout from "./components/layout/AppLayout.jsx";
 import { LoadingScreen } from "./components/ui/LoadingSpinner.jsx";
-import NotFound from "./components/Error/NotFound.jsx";
-import ProtectedRoute from "./components/Auth/ProtectedRoute.jsx";
+import NotFound from "./components/common/Error/NotFound.jsx";
+import ProtectedRoute from "./components/features/Auth/ProtectedRoute.jsx";
 
 // ----------------------------
 // Context Providers
@@ -83,210 +83,210 @@ const App = () => {
                   <LearningProvider>
                     <RealtimeProvider>
                       <AppLayout>
-                      <Routes>
-                      {/* Public Routes */}
-                      <Route path="/" element={<LandingPage />} />
-                      <Route path="/courses" element={<CoursePage />} />
-                      <Route
-                        path="/course/:courseId"
-                        element={<CourseDetailsPage />}
-                      />
-                      <Route path="/legal/:page" element={<LegalPage />} />
+                        <Routes>
+                          {/* Public Routes */}
+                          <Route path="/" element={<LandingPage />} />
+                          <Route path="/courses" element={<CoursePage />} />
+                          <Route
+                            path="/course/:courseId"
+                            element={<CourseDetailsPage />}
+                          />
+                          <Route path="/legal/:page" element={<LegalPage />} />
 
-                      {/* Auth Routes (No Layout Header/Footer) */}
-                      <Route path="/auth/signin" element={<SignIn />} />
-                      <Route path="/auth/signup" element={<SignUp />} />
-                      <Route path="/auth/forgot-password" element={<ForgotPassword />} />
+                          {/* Auth Routes (No Layout Header/Footer) */}
+                          <Route path="/auth/signin" element={<SignIn />} />
+                          <Route path="/auth/signup" element={<SignUp />} />
+                          <Route path="/auth/forgot-password" element={<ForgotPassword />} />
 
-                      {/* User Protected Routes */}
-                      <Route
-                        path="/profile"
-                        element={
-                          <ProtectedRoute>
-                            <ProfilePage />
-                          </ProtectedRoute>
-                        }
-                      />
-                      <Route
-                        path="/profile/edit"
-                        element={
-                          <ProtectedRoute>
-                            <ProfileEdit />
-                          </ProtectedRoute>
-                        }
-                      />
-                      <Route
-                        path="/learn/:courseId"
-                        element={
-                          <ProtectedRoute>
-                            <LearnPage />
-                          </ProtectedRoute>
-                        }
-                      />
-                      <Route
-                        path="/checkout/:courseId"
-                        element={
-                          <ProtectedRoute>
-                            <CheckoutPage />
-                          </ProtectedRoute>
-                        }
-                      />
+                          {/* User Protected Routes */}
+                          <Route
+                            path="/profile"
+                            element={
+                              <ProtectedRoute>
+                                <ProfilePage />
+                              </ProtectedRoute>
+                            }
+                          />
+                          <Route
+                            path="/profile/edit"
+                            element={
+                              <ProtectedRoute>
+                                <ProfileEdit />
+                              </ProtectedRoute>
+                            }
+                          />
+                          <Route
+                            path="/learn/:courseId"
+                            element={
+                              <ProtectedRoute>
+                                <LearnPage />
+                              </ProtectedRoute>
+                            }
+                          />
+                          <Route
+                            path="/checkout/:courseId"
+                            element={
+                              <ProtectedRoute>
+                                <CheckoutPage />
+                              </ProtectedRoute>
+                            }
+                          />
 
-                      {/*  Admin Routes (Lazy Loaded) */}
-                      <Route
-                        path="/admin"
-                        element={
-                          <ProtectedRoute requiredRole="admin">
-                            <Suspense fallback={<LoadingScreen />}>
-                              <AdminPage />
-                            </Suspense>
-                          </ProtectedRoute>
-                        }
-                      />
-                      <Route
-                        path="/admin/analytics"
-                        element={
-                          <ProtectedRoute requiredRole="admin">
-                            <Suspense fallback={<LoadingScreen />}>
-                              <Analytics />
-                            </Suspense>
-                          </ProtectedRoute>
-                        }
-                      />
+                          {/*  Admin Routes (Lazy Loaded) */}
+                          <Route
+                            path="/admin"
+                            element={
+                              <ProtectedRoute requiredRole="admin">
+                                <Suspense fallback={<LoadingScreen />}>
+                                  <AdminPage />
+                                </Suspense>
+                              </ProtectedRoute>
+                            }
+                          />
+                          <Route
+                            path="/admin/analytics"
+                            element={
+                              <ProtectedRoute requiredRole="admin">
+                                <Suspense fallback={<LoadingScreen />}>
+                                  <Analytics />
+                                </Suspense>
+                              </ProtectedRoute>
+                            }
+                          />
 
-                      <Route
-                        path="/admin/certifications"
-                        element={
-                          <ProtectedRoute requiredRole="admin">
-                            <Suspense fallback={<LoadingScreen />}>
-                              <CertificateGenerator />
-                            </Suspense>
-                          </ProtectedRoute>
-                        }
-                      />
-                      <Route
-                        path="/admin/users"
-                        element={
-                          <ProtectedRoute requiredRole="admin">
-                            <Suspense fallback={<LoadingScreen />}>
-                              <UsersManagement />
-                            </Suspense>
-                          </ProtectedRoute>
-                        }
-                      />
-                      <Route
-                        path="/admin/users/create/new"
-                        element={
-                          <ProtectedRoute requiredRole="admin">
-                            <Suspense fallback={<LoadingScreen />}>
-                              <UserManagementForm />
-                            </Suspense>
-                          </ProtectedRoute>
-                        }
-                      />
-                      <Route
-                        path="/admin/users/manage/:userId"
-                        element={
-                          <ProtectedRoute requiredRole="admin">
-                            <Suspense fallback={<LoadingScreen />}>
-                              <UserManagementForm />
-                            </Suspense>
-                          </ProtectedRoute>
-                        }
-                      />
-                      <Route
-                        path="/admin/courses"
-                        element={
-                          <ProtectedRoute requiredRole="admin">
-                            <Suspense fallback={<LoadingScreen />}>
-                              <CourseManagement />
-                            </Suspense>
-                          </ProtectedRoute>
-                        }
-                      />
-                      <Route
-                        path="/admin/courses/create/new"
-                        element={
-                          <ProtectedRoute requiredRole="admin">
-                            <Suspense fallback={<LoadingScreen />}>
-                              <CourseCreateForm />
-                            </Suspense>
-                          </ProtectedRoute>
-                        }
-                      />
-                      <Route
-                        path="/admin/courses/edit/:courseId"
-                        element={
-                          <ProtectedRoute requiredRole="admin">
-                            <Suspense fallback={<LoadingScreen />}>
-                              <CourseEditForm />
-                            </Suspense>
-                          </ProtectedRoute>
-                        }
-                      />
-                      <Route
-                        path="/admin/coupons"
-                        element={
-                          <ProtectedRoute requiredRole="admin">
-                            <Suspense fallback={<LoadingScreen />}>
-                              <AdminCoupons />
-                            </Suspense>
-                          </ProtectedRoute>
-                        }
-                      />
-                      <Route
-                        path="/admin/coupons/create"
-                        element={
-                          <ProtectedRoute requiredRole="admin">
-                            <Suspense fallback={<LoadingScreen />}>
-                              <CreateEditCouponPage />
-                            </Suspense>
-                          </ProtectedRoute>
-                        }
-                      />
-                      <Route
-                        path="/admin/coupons/edit/:couponId"
-                        element={
-                          <ProtectedRoute requiredRole="admin">
-                            <Suspense fallback={<LoadingScreen />}>
-                              <CreateEditCouponPage />
-                            </Suspense>
-                          </ProtectedRoute>
-                        }
-                      />
-                      <Route
-                        path="/admin/enrollments"
-                        element={
-                          <ProtectedRoute requiredRole="admin">
-                            <Suspense fallback={<LoadingScreen />}>
-                              <EnrollmentManagement />
-                            </Suspense>
-                          </ProtectedRoute>
-                        }
-                      />
+                          <Route
+                            path="/admin/certifications"
+                            element={
+                              <ProtectedRoute requiredRole="admin">
+                                <Suspense fallback={<LoadingScreen />}>
+                                  <CertificateGenerator />
+                                </Suspense>
+                              </ProtectedRoute>
+                            }
+                          />
+                          <Route
+                            path="/admin/users"
+                            element={
+                              <ProtectedRoute requiredRole="admin">
+                                <Suspense fallback={<LoadingScreen />}>
+                                  <UsersManagement />
+                                </Suspense>
+                              </ProtectedRoute>
+                            }
+                          />
+                          <Route
+                            path="/admin/users/create/new"
+                            element={
+                              <ProtectedRoute requiredRole="admin">
+                                <Suspense fallback={<LoadingScreen />}>
+                                  <UserManagementForm />
+                                </Suspense>
+                              </ProtectedRoute>
+                            }
+                          />
+                          <Route
+                            path="/admin/users/manage/:userId"
+                            element={
+                              <ProtectedRoute requiredRole="admin">
+                                <Suspense fallback={<LoadingScreen />}>
+                                  <UserManagementForm />
+                                </Suspense>
+                              </ProtectedRoute>
+                            }
+                          />
+                          <Route
+                            path="/admin/courses"
+                            element={
+                              <ProtectedRoute requiredRole="admin">
+                                <Suspense fallback={<LoadingScreen />}>
+                                  <CourseManagement />
+                                </Suspense>
+                              </ProtectedRoute>
+                            }
+                          />
+                          <Route
+                            path="/admin/courses/create/new"
+                            element={
+                              <ProtectedRoute requiredRole="admin">
+                                <Suspense fallback={<LoadingScreen />}>
+                                  <CourseCreateForm />
+                                </Suspense>
+                              </ProtectedRoute>
+                            }
+                          />
+                          <Route
+                            path="/admin/courses/edit/:courseId"
+                            element={
+                              <ProtectedRoute requiredRole="admin">
+                                <Suspense fallback={<LoadingScreen />}>
+                                  <CourseEditForm />
+                                </Suspense>
+                              </ProtectedRoute>
+                            }
+                          />
+                          <Route
+                            path="/admin/coupons"
+                            element={
+                              <ProtectedRoute requiredRole="admin">
+                                <Suspense fallback={<LoadingScreen />}>
+                                  <AdminCoupons />
+                                </Suspense>
+                              </ProtectedRoute>
+                            }
+                          />
+                          <Route
+                            path="/admin/coupons/create"
+                            element={
+                              <ProtectedRoute requiredRole="admin">
+                                <Suspense fallback={<LoadingScreen />}>
+                                  <CreateEditCouponPage />
+                                </Suspense>
+                              </ProtectedRoute>
+                            }
+                          />
+                          <Route
+                            path="/admin/coupons/edit/:couponId"
+                            element={
+                              <ProtectedRoute requiredRole="admin">
+                                <Suspense fallback={<LoadingScreen />}>
+                                  <CreateEditCouponPage />
+                                </Suspense>
+                              </ProtectedRoute>
+                            }
+                          />
+                          <Route
+                            path="/admin/enrollments"
+                            element={
+                              <ProtectedRoute requiredRole="admin">
+                                <Suspense fallback={<LoadingScreen />}>
+                                  <EnrollmentManagement />
+                                </Suspense>
+                              </ProtectedRoute>
+                            }
+                          />
 
-                      <Route
-                        path="/admin/enrollments/manual"
-                        element={
-                          <ProtectedRoute requiredRole="admin">
-                            <Suspense fallback={<LoadingScreen />}>
-                              <ManualEnrollmentForm />
-                            </Suspense>
-                          </ProtectedRoute>
-                        }
-                      />
+                          <Route
+                            path="/admin/enrollments/manual"
+                            element={
+                              <ProtectedRoute requiredRole="admin">
+                                <Suspense fallback={<LoadingScreen />}>
+                                  <ManualEnrollmentForm />
+                                </Suspense>
+                              </ProtectedRoute>
+                            }
+                          />
 
-                      {/* 404 Fallback */}
-                      <Route path="*" element={<NotFound />} />
-                    </Routes>
-                    </AppLayout>
-                  </RealtimeProvider>
-                </LearningProvider>
-              </LearnPageProvider>
-            </PaymentProvider>
-          </CourseProvider>
-        </UserProvider>
-      </AuthProvider>
+                          {/* 404 Fallback */}
+                          <Route path="*" element={<NotFound />} />
+                        </Routes>
+                      </AppLayout>
+                    </RealtimeProvider>
+                  </LearningProvider>
+                </LearnPageProvider>
+              </PaymentProvider>
+            </CourseProvider>
+          </UserProvider>
+        </AuthProvider>
       </ToastProvider>
     </Router>
   );

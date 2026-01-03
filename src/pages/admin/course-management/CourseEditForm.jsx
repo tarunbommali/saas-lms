@@ -30,11 +30,11 @@ import {
   validateCompleteCourse,
 } from "../../../utils/validation/courseFormValidation.js.js";
 
-import BasicInfoTab from "../../../components/Admin/BasicInfoTab.jsx";
-import PricingTab from "../../../components/Admin/PricingTab.jsx";
-import ContentTab from "../../../components/Admin/ContentTab.jsx";
-import MediaTab from "../../../components/Admin/MediaTab.jsx";
-import PreviewTab from "../../../components/Admin/PreviewTab.jsx";
+import BasicInfoTab from "../../../components/features/Admin/BasicInfoTab.jsx";
+import PricingTab from "../../../components/features/Admin/PricingTab.jsx";
+import ContentTab from "../../../components/features/Admin/ContentTab.jsx";
+import MediaTab from "../../../components/features/Admin/MediaTab.jsx";
+import PreviewTab from "../../../components/features/Admin/PreviewTab.jsx";
 import PageContainer from "../../../components/layout/PageContainer.jsx";
 import PageTitle from "../../../components/ui/PageTitle.jsx";
 import ToastNotification from "../../../components/ui/ToastNotification.jsx";
@@ -125,10 +125,10 @@ const CourseEditForm = () => {
 
   // Enhanced Toast utility with titles and better positioning
   const showToast = (message, type = "success", title = "") => {
-    setToast({ 
-      show: true, 
-      message, 
-      type, 
+    setToast({
+      show: true,
+      message,
+      type,
       title,
       position: "bottom-center"
     });
@@ -141,15 +141,15 @@ const CourseEditForm = () => {
   // Show API operation start notification
   const showApiStartToast = (operation, isDraft = false) => {
     const operations = {
-      update: { 
-        title: isDraft ? "Saving Draft" : "Updating Course", 
-        message: isDraft ? "Updating draft version..." : "Updating course information..." 
+      update: {
+        title: isDraft ? "Saving Draft" : "Updating Course",
+        message: isDraft ? "Updating draft version..." : "Updating course information..."
       },
     };
-    
-    const op = operations[operation] || { 
-      title: isDraft ? "Saving Draft" : "Saving", 
-      message: "Processing your request..." 
+
+    const op = operations[operation] || {
+      title: isDraft ? "Saving Draft" : "Saving",
+      message: "Processing your request..."
     };
     showToast(op.message, "info", op.title);
   };
@@ -157,17 +157,17 @@ const CourseEditForm = () => {
   // Show API operation success notification
   const showApiSuccessToast = (operation, isDraft = false) => {
     const operations = {
-      update: { 
-        title: isDraft ? "Draft Updated!" : "Course Updated!", 
-        message: isDraft 
+      update: {
+        title: isDraft ? "Draft Updated!" : "Course Updated!",
+        message: isDraft
           ? "Your draft has been updated successfully."
-          : "Your course has been updated successfully." 
+          : "Your course has been updated successfully."
       },
     };
-    
-    const op = operations[operation] || { 
-      title: isDraft ? "Draft Saved!" : "Success!", 
-      message: "Operation completed successfully." 
+
+    const op = operations[operation] || {
+      title: isDraft ? "Draft Saved!" : "Success!",
+      message: "Operation completed successfully."
     };
     showToast(op.message, "success", op.title);
   };
@@ -216,9 +216,9 @@ const CourseEditForm = () => {
 
       try {
         console.log("📘 Fetching course with ID:", actualCourseId);
-        
+
         const courseData = await getCourseById(actualCourseId);
-        
+
         if (courseData) {
           const mapped = mapCourseDataToForm(courseData);
           setFormData(mapped);
@@ -253,8 +253,8 @@ const CourseEditForm = () => {
       : null;
 
     showToast(
-      firstErrorMessage || "Please review the highlighted fields.", 
-      "error", 
+      firstErrorMessage || "Please review the highlighted fields.",
+      "error",
       "Validation Error"
     );
   };
@@ -311,7 +311,7 @@ const CourseEditForm = () => {
           ? normalizedFriendly
           : `${prefix}: ${normalizedFriendly}`
         : prefix;
-      
+
       showToast(finalMessage, "error", "Save Failed");
     } finally {
       setSavingAsDraft(false);
@@ -360,7 +360,7 @@ const CourseEditForm = () => {
           ? normalizedFriendly
           : `${prefix}: ${normalizedFriendly}`
         : prefix;
-      
+
       showToast(finalMessage, "error", "Update Failed");
     } finally {
       setSaving(false);
@@ -508,11 +508,10 @@ const CourseEditForm = () => {
                   key={tab.id}
                   type="button"
                   onClick={() => setActiveTab(tab.id)}
-                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-left transition-colors ${
-                    activeTab === tab.id
+                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-left transition-colors ${activeTab === tab.id
                       ? "bg-blue-50 text-blue-700 border border-blue-200"
                       : "text-gray-600 hover:text-gray-900 hover:bg-gray-50"
-                  }`}
+                    }`}
                 >
                   <tab.icon className="w-5 h-5 flex-shrink-0" />
                   <span className="font-medium">{tab.label}</span>
@@ -542,9 +541,9 @@ const CourseEditForm = () => {
                 ) : (
                   <Save className="w-5 h-5" />
                 )}
-                {savingAsDraft 
-                  ? "Saving Draft..." 
-                  : course.isPublished 
+                {savingAsDraft
+                  ? "Saving Draft..."
+                  : course.isPublished
                     ? "Unpublish & Save as Draft"
                     : "Save as Draft"
                 }
@@ -561,8 +560,8 @@ const CourseEditForm = () => {
                 ) : (
                   <Eye className="w-5 h-5" />
                 )}
-                {saving 
-                  ? "Updating..." 
+                {saving
+                  ? "Updating..."
                   : course.isPublished
                     ? "Update Published Course"
                     : "Publish Course"

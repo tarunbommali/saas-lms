@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { useAuth } from "../contexts/AuthContext";
 import { useRealtime } from "../contexts/RealtimeContext";
 import PageContainer from "../components/layout/PageContainer";
-import CourseList from "../components/Course/CourseList";
+import CourseList from "../components/features/Course/CourseList";
 import { Alert, AlertDescription, AlertIcon } from "../components/ui/Alert";
 import LoadingSpinner from "../components/ui/LoadingSpinner";
 import PageTitle from "../components/ui/PageTitle";
@@ -40,10 +40,10 @@ const CoursePage = () => {
       )
       .map((course) => {
         // Parse modules if it's a JSON string
-        const modules = typeof course.modules === 'string' 
-          ? JSON.parse(course.modules || '[]') 
+        const modules = typeof course.modules === 'string'
+          ? JSON.parse(course.modules || '[]')
           : (course.modules || []);
-        
+
         // Calculate total lessons from modules
         const totalLessons =
           modules?.reduce((total, module) => {

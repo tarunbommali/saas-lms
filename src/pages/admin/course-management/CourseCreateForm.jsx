@@ -27,11 +27,11 @@ import {
   getFirstErrorField,
 } from "../../../utils/validation/courseFormValidation.js.js";
 
-import BasicInfoTab from "../../../components/Admin/BasicInfoTab.jsx";
-import PricingTab from "../../../components/Admin/PricingTab.jsx";
-import ContentTab from "../../../components/Admin/ContentTab.jsx";
-import MediaTab from "../../../components/Admin/MediaTab.jsx";
-import PreviewTab from "../../../components/Admin/PreviewTab.jsx";
+import BasicInfoTab from "../../../components/features/Admin/BasicInfoTab.jsx";
+import PricingTab from "../../../components/features/Admin/PricingTab.jsx";
+import ContentTab from "../../../components/features/Admin/ContentTab.jsx";
+import MediaTab from "../../../components/features/Admin/MediaTab.jsx";
+import PreviewTab from "../../../components/features/Admin/PreviewTab.jsx";
 import PageContainer from "../../../components/layout/PageContainer.jsx";
 import PageTitle from "../../../components/ui/PageTitle.jsx";
 import ToastNotification from "../../../components/ui/ToastNotification.jsx";
@@ -117,10 +117,10 @@ const CourseCreateForm = () => {
 
   // Enhanced Toast utility with titles and better positioning
   const showToast = (message, type = "success", title = "") => {
-    setToast({ 
-      show: true, 
-      message, 
-      type, 
+    setToast({
+      show: true,
+      message,
+      type,
       title,
       position: "bottom-center"
     });
@@ -133,15 +133,15 @@ const CourseCreateForm = () => {
   // Show API operation start notification
   const showApiStartToast = (operation, isDraft = false) => {
     const operations = {
-      create: { 
-        title: isDraft ? "Saving Draft" : "Creating Course", 
-        message: isDraft ? "Saving course as draft..." : "Saving your course data..." 
+      create: {
+        title: isDraft ? "Saving Draft" : "Creating Course",
+        message: isDraft ? "Saving course as draft..." : "Saving your course data..."
       },
     };
-    
-    const op = operations[operation] || { 
-      title: isDraft ? "Saving Draft" : "Saving", 
-      message: "Processing your request..." 
+
+    const op = operations[operation] || {
+      title: isDraft ? "Saving Draft" : "Saving",
+      message: "Processing your request..."
     };
     showToast(op.message, "info", op.title);
   };
@@ -149,17 +149,17 @@ const CourseCreateForm = () => {
   // Show API operation success notification
   const showApiSuccessToast = (operation, isDraft = false) => {
     const operations = {
-      create: { 
-        title: isDraft ? "Draft Saved!" : "Course Created!", 
-        message: isDraft 
-          ? "Your course has been saved as draft." 
-          : "Your course has been created successfully and is now live!" 
+      create: {
+        title: isDraft ? "Draft Saved!" : "Course Created!",
+        message: isDraft
+          ? "Your course has been saved as draft."
+          : "Your course has been created successfully and is now live!"
       },
     };
-    
-    const op = operations[operation] || { 
-      title: isDraft ? "Draft Saved!" : "Success!", 
-      message: "Operation completed successfully." 
+
+    const op = operations[operation] || {
+      title: isDraft ? "Draft Saved!" : "Success!",
+      message: "Operation completed successfully."
     };
     showToast(op.message, "success", op.title);
   };
@@ -215,8 +215,8 @@ const CourseCreateForm = () => {
         : null;
 
       showToast(
-        firstErrorMessage || "Please review the highlighted fields.", 
-        "error", 
+        firstErrorMessage || "Please review the highlighted fields.",
+        "error",
         "Validation Error"
       );
       return;
@@ -255,7 +255,7 @@ const CourseCreateForm = () => {
           ? normalizedFriendly
           : `${prefix}: ${normalizedFriendly}`
         : prefix;
-      
+
       showToast(finalMessage, "error", "Save Failed");
     } finally {
       setSavingAsDraft(false);
@@ -280,8 +280,8 @@ const CourseCreateForm = () => {
         : null;
 
       showToast(
-        firstErrorMessage || "Please review the highlighted fields.", 
-        "error", 
+        firstErrorMessage || "Please review the highlighted fields.",
+        "error",
         "Validation Error"
       );
       return;
@@ -320,7 +320,7 @@ const CourseCreateForm = () => {
           ? normalizedFriendly
           : `${prefix}: ${normalizedFriendly}`
         : prefix;
-      
+
       showToast(finalMessage, "error", "Publish Failed");
     } finally {
       setSaving(false);
@@ -437,11 +437,10 @@ const CourseCreateForm = () => {
                   key={tab.id}
                   type="button"
                   onClick={() => setActiveTab(tab.id)}
-                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-left transition-colors ${
-                    activeTab === tab.id
+                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-left transition-colors ${activeTab === tab.id
                       ? "bg-blue-50 text-blue-700 border border-blue-200"
                       : "text-gray-600 hover:text-gray-900 hover:bg-gray-50"
-                  }`}
+                    }`}
                 >
                   <tab.icon className="w-5 h-5 flex-shrink-0" />
                   <span className="font-medium">{tab.label}</span>

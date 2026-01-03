@@ -23,7 +23,7 @@ import { useAuth } from "../contexts/AuthContext.jsx";
 import { useUser } from "../contexts/UserContext.jsx";
 import { global_classnames } from "../utils/classnames.js";
 import PageContainer from "../components/layout/PageContainer.jsx";
-import CertificateTemplate from "../components/Certificate/CertificateTemplate.jsx";
+import CertificateTemplate from "../components/features/Certificate/CertificateTemplate.jsx";
 import { getCleanEnrollmentData } from "../utils/helper/enrollmentHelpers.jsx";
 import html2canvas from "html2canvas";
 import { jsPDF } from "jspdf";

@@ -1,36 +1,26 @@
 /* eslint-disable no-console */
-import dotenv from 'dotenv';
 import mysql from 'mysql2';
 import { drizzle } from 'drizzle-orm/mysql2';
 import bcrypt from 'bcryptjs';
 import { randomUUID } from 'crypto';
 import * as schema from './schema.js';
-
-// Load environment variables
-dotenv.config();
-
-const {
-  DB_HOST = 'localhost',
-  DB_USER = 'root',
-  DB_PASSWORD = 'Disistarun@2001',
-  DB_NAME = 'jntugv_certification',
-  DB_PORT,
-} = process.env;
+import { config } from '../config/index.js';
+import logger from '../utils/logger.js';
 
 const connection = mysql.createConnection({
-  host: DB_HOST,
-  user: DB_USER,
-  password: DB_PASSWORD,
-  database: DB_NAME,
-  port: DB_PORT ? Number(DB_PORT) : undefined,
+  host: config.db.host || 'localhost',
+  user: config.db.user || 'root',
+  password: config.db.password,
+  database: config.db.name,
+  port: process.env.DB_PORT ? Number(process.env.DB_PORT) : undefined,
 });
 
 connection.connect((error) => {
   if (error) {
-    console.error('Failed to connect to MySQL:', error.message);
+    logger.error('Failed to connect to MySQL:', error.message);
     throw error;
   }
-  console.log('Connected to MySQL database via mysql.createConnection');
+  logger.info('Connected to MySQL database via mysql.createConnection');
 });
 
 const createTablesStatements = [
@@ -222,11 +212,6 @@ const createTablesStatements = [
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     CONSTRAINT fk_coupons_created_by FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;`,
-
-  // =====================================================
-  // LMS Tables - Modules, Quizzes, Progress Tracking
-  // =====================================================
-
   `CREATE TABLE IF NOT EXISTS course_modules (
     id VARCHAR(36) NOT NULL PRIMARY KEY,
     course_id VARCHAR(36) NOT NULL,
@@ -249,7 +234,6 @@ const createTablesStatements = [
     INDEX idx_course_modules_course_id (course_id),
     INDEX idx_course_modules_order (course_id, order_index)
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;`,
-
   `CREATE TABLE IF NOT EXISTS module_lessons (
     id VARCHAR(36) NOT NULL PRIMARY KEY,
     module_id VARCHAR(36) NOT NULL,
@@ -268,7 +252,6 @@ const createTablesStatements = [
     INDEX idx_module_lessons_module_id (module_id),
     INDEX idx_module_lessons_order (module_id, order_index)
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;`,
-
   `CREATE TABLE IF NOT EXISTS quizzes (
     id VARCHAR(36) NOT NULL PRIMARY KEY,
     course_id VARCHAR(36) NOT NULL,
@@ -298,7 +281,6 @@ const createTablesStatements = [
     INDEX idx_quizzes_module_id (module_id),
     INDEX idx_quizzes_lesson_id (lesson_id)
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;`,
-
   `CREATE TABLE IF NOT EXISTS quiz_questions (
     id VARCHAR(36) NOT NULL PRIMARY KEY,
     quiz_id VARCHAR(36) NOT NULL,
@@ -318,7 +300,6 @@ const createTablesStatements = [
     INDEX idx_quiz_questions_quiz_id (quiz_id),
     INDEX idx_quiz_questions_order (quiz_id, order_index)
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;`,
-
   `CREATE TABLE IF NOT EXISTS quiz_attempts (
     id VARCHAR(36) NOT NULL PRIMARY KEY,
     quiz_id VARCHAR(36) NOT NULL,
@@ -352,7 +333,6 @@ const createTablesStatements = [
     INDEX idx_quiz_attempts_enrollment (enrollment_id),
     INDEX idx_quiz_attempts_lesson (lesson_id)
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;`,
-
   `CREATE TABLE IF NOT EXISTS user_module_progress (
     id VARCHAR(36) NOT NULL PRIMARY KEY,
     user_id VARCHAR(36) NOT NULL,
@@ -379,7 +359,6 @@ const createTablesStatements = [
     INDEX idx_user_module_progress_user_course (user_id, course_id),
     INDEX idx_user_module_progress_enrollment (enrollment_id)
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;`,
-
   `CREATE TABLE IF NOT EXISTS user_lesson_progress (
     id VARCHAR(36) NOT NULL PRIMARY KEY,
     user_id VARCHAR(36) NOT NULL,
@@ -421,10 +400,10 @@ const ensureIndexExists = async (client, tableName, indexName, indexDefinition) 
   if (!rows || rows.length === 0) {
     try {
       await client.query(`CREATE INDEX ${indexName} ON ${tableName} ${indexDefinition}`);
-      console.log(`✅ Created index ${indexName} on ${tableName}`);
+      logger.info(`✅ Created index ${indexName} on ${tableName}`);
     } catch (error) {
       if (!error.message.includes('Duplicate key name')) {
-        console.warn(`⚠️ Could not create index ${indexName} on ${tableName}:`, error.message);
+        logger.warn(`⚠️ Could not create index ${indexName} on ${tableName}:`, error.message);
       }
     }
   }
@@ -439,24 +418,24 @@ const ensureForeignKeyExists = async (client, tableName, constraintName, constra
   if (!rows || rows.length === 0) {
     try {
       await client.query(`ALTER TABLE \`${tableName}\` ADD CONSTRAINT ${constraintName} ${constraintDefinition}`);
-      console.log(`✅ Added foreign key ${constraintName} on ${tableName}`);
+      logger.info(`✅ Added foreign key ${constraintName} on ${tableName}`);
     } catch (error) {
       if (!error.message.toLowerCase().includes('duplicate')) {
-        console.warn(`⚠️ Could not add foreign key ${constraintName} on ${tableName}:`, error.message);
+        logger.warn(`⚠️ Could not add foreign key ${constraintName} on ${tableName}:`, error.message);
       }
     }
   }
 };
 
 const createPerformanceIndexes = async (client) => {
-  console.log('📊 Creating performance indexes...');
-  
+  logger.info('📊 Creating performance indexes...');
+
   // Users table indexes
   await ensureIndexExists(client, 'users', 'idx_users_email', '(email)');
   await ensureIndexExists(client, 'users', 'idx_users_is_admin', '(is_admin)');
   await ensureIndexExists(client, 'users', 'idx_users_is_active', '(is_active)');
   await ensureIndexExists(client, 'users', 'idx_users_google_id', '(google_id)');
-  
+
   // Courses table indexes
   await ensureIndexExists(client, 'courses', 'idx_courses_is_published', '(is_published)');
   await ensureIndexExists(client, 'courses', 'idx_courses_category', '(category)');
@@ -464,29 +443,29 @@ const createPerformanceIndexes = async (client) => {
   await ensureIndexExists(client, 'courses', 'idx_courses_slug', '(slug)');
   await ensureIndexExists(client, 'courses', 'idx_courses_created_by', '(created_by)');
   await ensureIndexExists(client, 'courses', 'idx_courses_status', '(status)');
-  
+
   // Enrollments table indexes
   await ensureIndexExists(client, 'enrollments', 'idx_enrollments_user_id', '(user_id)');
   await ensureIndexExists(client, 'enrollments', 'idx_enrollments_course_id', '(course_id)');
   await ensureIndexExists(client, 'enrollments', 'idx_enrollments_status', '(status)');
   await ensureIndexExists(client, 'enrollments', 'idx_enrollments_user_course', '(user_id, course_id)');
-  
+
   // Certifications table indexes
   await ensureIndexExists(client, 'certifications', 'idx_certifications_user_id', '(user_id)');
   await ensureIndexExists(client, 'certifications', 'idx_certifications_course_id', '(course_id)');
   await ensureIndexExists(client, 'certifications', 'idx_certifications_status', '(status)');
-  
+
   // Payments table indexes
   await ensureIndexExists(client, 'payments', 'idx_payments_user_id', '(user_id)');
   await ensureIndexExists(client, 'payments', 'idx_payments_course_id', '(course_id)');
   await ensureIndexExists(client, 'payments', 'idx_payments_status', '(status)');
   await ensureIndexExists(client, 'payments', 'idx_payments_order_id', '(order_id)');
-  
+
   // Coupons table indexes
   await ensureIndexExists(client, 'coupons', 'idx_coupons_code', '(code)');
   await ensureIndexExists(client, 'coupons', 'idx_coupons_is_active', '(is_active)');
-  
-  console.log('✅ Performance indexes created');
+
+  logger.info('✅ Performance indexes created');
 };
 
 const initializeDatabase = async () => {
@@ -536,11 +515,11 @@ const initializeDatabase = async () => {
   );
   await ensureIndexExists(client, 'quizzes', 'idx_quizzes_lesson_id', '(lesson_id)');
   await ensureIndexExists(client, 'quiz_attempts', 'idx_quiz_attempts_lesson', '(lesson_id)');
-  
+
   // Create performance indexes
   await createPerformanceIndexes(client);
-  
-  console.log('✅ Database tables and indexes initialized');
+
+  logger.info('✅ Database tables and indexes initialized');
 };
 
 const seedDefaultAdmin = async () => {
@@ -548,14 +527,14 @@ const seedDefaultAdmin = async () => {
   const password = process.env.ADMIN_PASSWORD?.trim();
 
   if (!email || !password) {
-    console.warn('⚠️  Skipping default admin seed. Provide ADMIN_EMAIL and ADMIN_PASSWORD env vars to auto-create an admin user.');
+    logger.warn('⚠️  Skipping default admin seed. Provide ADMIN_EMAIL and ADMIN_PASSWORD env vars to auto-create an admin user.');
     return;
   }
 
   const client = connection.promise();
   const [existing] = await client.query('SELECT id FROM users WHERE email = ?', [email.toLowerCase()]);
   if (existing && existing.length > 0) {
-    console.log(`ℹ️  Admin user already exists for ${email}. Skipping seed.`);
+    logger.info(`ℹ️  Admin user already exists for ${email}. Skipping seed.`);
     return;
   }
 
@@ -589,7 +568,7 @@ const seedDefaultAdmin = async () => {
     ]
   );
 
-  console.log(`✅ Seeded default admin user (${email}). Remember to rotate ADMIN_PASSWORD after first login.`);
+  logger.info(`✅ Seeded default admin user (${email}). Remember to rotate ADMIN_PASSWORD after first login.`);
 };
 
 export const db = drizzle(connection.promise(), { schema, mode: 'default' });
@@ -598,9 +577,9 @@ export const dbReady = (async () => {
   try {
     await initializeDatabase();
     await seedDefaultAdmin();
-    console.log('✅ Database schema ready');
+    logger.info('✅ Database schema ready');
   } catch (error) {
-    console.error('❌ Database initialization failed:', error);
+    logger.error('❌ Database initialization failed:', error);
     throw error;
   }
 })();

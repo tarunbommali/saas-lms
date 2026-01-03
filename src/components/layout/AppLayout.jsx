@@ -1,9 +1,9 @@
 import "react";
 import { useLocation } from "react-router-dom";
-import Header from "../Header";
-import Footer from "../Footer";
-import WhatsAppChat from "../FloatingButtons/WhatsAppChat";
-import ScrollToTop from "../FloatingButtons/ScrollToTop";
+import Header from "./Header";
+import Footer from "./Footer";
+import WhatsAppChat from "../shared/FloatingButtons/WhatsAppChat";
+import ScrollToTop from "../shared/FloatingButtons/ScrollToTop";
 
 const AppLayout = ({ children }) => {
   const location = useLocation();

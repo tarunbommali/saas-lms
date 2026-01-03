@@ -16,7 +16,7 @@ import {
   Eye,
   EyeOff
 } from "lucide-react";
-import CourseCard from "../../../components/Course/CourseCard.jsx";
+import CourseCard from "../../../components/features/Course/CourseCard.jsx";
 import PageContainer from "../../../components/layout/PageContainer.jsx";
 import PageTitle from "../../../components/ui/PageTitle.jsx";
 import LoadingSpinner from "../../../components/ui/LoadingSpinner.jsx";
@@ -268,8 +268,8 @@ const CourseManagement = () => {
         <button
           onClick={() => setSearchTerm("")}
           className={`px-3 py-1 rounded-full text-sm font-medium transition-colors ${searchTerm === ""
-              ? "bg-blue-600 text-white"
-              : "bg-gray-200 text-gray-700 hover:bg-gray-300"
+            ? "bg-blue-600 text-white"
+            : "bg-gray-200 text-gray-700 hover:bg-gray-300"
             }`}
         >
           All Courses ({stats.total})
@@ -277,8 +277,8 @@ const CourseManagement = () => {
         <button
           onClick={() => setSearchTerm("status:published")}
           className={`px-3 py-1 rounded-full text-sm font-medium transition-colors ${searchTerm === "status:published"
-              ? "bg-green-600 text-white"
-              : "bg-gray-200 text-gray-700 hover:bg-gray-300"
+            ? "bg-green-600 text-white"
+            : "bg-gray-200 text-gray-700 hover:bg-gray-300"
             }`}
         >
           Published ({stats.published})
@@ -286,8 +286,8 @@ const CourseManagement = () => {
         <button
           onClick={() => setSearchTerm("status:draft")}
           className={`px-3 py-1 rounded-full text-sm font-medium transition-colors ${searchTerm === "status:draft"
-              ? "bg-yellow-600 text-white"
-              : "bg-gray-200 text-gray-700 hover:bg-gray-300"
+            ? "bg-yellow-600 text-white"
+            : "bg-gray-200 text-gray-700 hover:bg-gray-300"
             }`}
         >
           Drafts ({stats.drafts})

@@ -1,21 +1,21 @@
 /* eslint-disable no-unused-vars */
-import Hero from "../components/LandingPage/Hero/Hero";
-import About from "../components/LandingPage/About/About";
-import Contact from "../components/LandingPage/Contact/Contact";
-import Skills from "../components/LandingPage/Skills/Skills";
-import Faq from "../components/LandingPage/Faq/FAQSection.jsx";
-import JoinCommunity from "../components/LandingPage/JoinCommunity/JoinCommunity";
-import Testimonial from "../components/LandingPage/Testimonial/Testimonial";
+import Hero from "../components/features/LandingPage/Hero/Hero";
+import About from "../components/features/LandingPage/About/About";
+import Contact from "../components/features/LandingPage/Contact/Contact";
+import Skills from "../components/features/LandingPage/Skills/Skills";
+import Faq from "../components/features/LandingPage/Faq/FAQSection.jsx";
+import JoinCommunity from "../components/features/LandingPage/JoinCommunity/JoinCommunity";
+import Testimonial from "../components/features/LandingPage/Testimonial/Testimonial";
 import { useRealtime } from "../contexts/RealtimeContext";
-import FeaturedCourses from "../components/LandingPage/FeaturedCourses/FeaturedCourses";
+import FeaturedCourses from "../components/features/LandingPage/FeaturedCourses/FeaturedCourses";
 
 const LandingPage = () => {
   const { courses } = useRealtime();
 
   const featuredCourses = Array.isArray(courses)
     ? courses.filter(
-        (course) => course?.isFeatured === true || course?.featured === true
-      )
+      (course) => course?.isFeatured === true || course?.featured === true
+    )
     : [];
 
   return (

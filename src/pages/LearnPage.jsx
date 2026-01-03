@@ -7,9 +7,9 @@ import { useAuth } from '../contexts/AuthContext.jsx';
 import { useLearnPage } from '../contexts/LearnPageContext.jsx';
 import { useRealtimeEnrollmentStatus } from '../hooks/useRealtimeApi.js';
 import { updateUserProgress } from '../services/index.js';
-import VideoPlayer from '../components/Course/VideoPlayer.jsx';
-import CourseContentShimmer from '../components/Course/CourseContentShimmer.jsx';
-import LessonQuizPane from '../components/learning/LessonQuizPane.jsx';
+import VideoPlayer from '../components/features/Course/VideoPlayer.jsx';
+import CourseContentShimmer from '../components/features/Course/CourseContentShimmer.jsx';
+import LessonQuizPane from '../components/features/learning/LessonQuizPane.jsx';
 import { global_classnames } from "../utils/classnames.js";
 import { PlayCircle, List, ArrowRight, Clock, CheckCircle, Lock, AlertTriangle, FileText, FileQuestion, Link as LinkIcon, Image as ImageIcon, Download } from 'lucide-react';
 
@@ -714,10 +714,10 @@ const LearnPage = () => {
                                         <li
                                             key={module.id}
                                             className={`p-4 transition-colors ${isCurrent
-                                                    ? 'bg-blue-50 dark:bg-blue-900/20 border-l-4 border-primary'
-                                                    : isUnlocked
-                                                        ? 'hover:bg-hover cursor-pointer'
-                                                        : 'text-disabled cursor-not-allowed opacity-75'
+                                                ? 'bg-blue-50 dark:bg-blue-900/20 border-l-4 border-primary'
+                                                : isUnlocked
+                                                    ? 'hover:bg-hover cursor-pointer'
+                                                    : 'text-disabled cursor-not-allowed opacity-75'
                                                 }`}
                                         >
                                             <div
@@ -807,8 +807,8 @@ const LearnPage = () => {
                                                                                 setActiveContentType('video');
                                                                             }}
                                                                             className={`p-2 rounded border transition-colors ${isActiveVideo
-                                                                                    ? 'bg-blue-100 dark:bg-blue-900/40 border-primary'
-                                                                                    : 'hover:bg-hover border-theme'
+                                                                                ? 'bg-blue-100 dark:bg-blue-900/40 border-primary'
+                                                                                : 'hover:bg-hover border-theme'
                                                                                 } ${isUnlocked ? 'cursor-pointer' : 'cursor-not-allowed'}`}
                                                                         >
                                                                             <div className="flex items-center justify-between gap-3">
@@ -904,8 +904,8 @@ const LearnPage = () => {
                                                                                 setActiveContentType('quiz');
                                                                             }}
                                                                             className={`p-2 rounded border transition-colors ${isActiveQuiz
-                                                                                    ? 'bg-purple-100 dark:bg-purple-900/30 border-purple-500'
-                                                                                    : 'hover:bg-hover border-theme'
+                                                                                ? 'bg-purple-100 dark:bg-purple-900/30 border-purple-500'
+                                                                                : 'hover:bg-hover border-theme'
                                                                                 } ${isUnlocked ? 'cursor-pointer' : 'cursor-not-allowed'}`}
                                                                         >
                                                                             <div className="flex items-center justify-between gap-3">
