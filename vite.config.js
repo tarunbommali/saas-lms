@@ -20,10 +20,20 @@ export default defineConfig(({ mode }) => {
     }
   }
 
+  // Proxy all /api requests to backend
   proxy['/api'] = {
     target: backendProxyTarget,
     changeOrigin: true,
     secure: false,
+    ws: true, // Enable WebSocket proxying
+    configure: (proxy, options) => {
+      proxy.on('error', (err, _req, _res) => {
+        console.log('❌ Proxy error:', err);
+      });
+      proxy.on('proxyReq', (proxyReq, req, _res) => {
+        console.log('🔄 Proxying:', req.method, req.url, '→', options.target);
+      });
+    },
   }
 
   return {
@@ -33,6 +43,8 @@ export default defineConfig(({ mode }) => {
       port: 5173,
       proxy,
       allowedHosts: ['a169b887-422a-4075-b61e-0bdf6c0500ed.preview.emergentagent.com', '.preview.emergentagent.com'],
+      // Ensure the dev server starts even if port is in use
+      strictPort: false,
     },
     build: {
       rollupOptions: {

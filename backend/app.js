@@ -4,6 +4,8 @@ import helmet from "helmet";
 import morgan from "morgan";
 import compression from "compression";
 import rateLimit from "express-rate-limit";
+import path from "path";
+import { fileURLToPath } from "url";
 
 // Config
 import { config } from "./config/index.js";
@@ -28,10 +30,31 @@ import { notFound, errorHandler } from "./middleware/errorHandler.js";
 
 const app = express();
 
+// Get __dirname equivalent in ES modules
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
 // Global Middleware
+// CORS - Allow requests from Vite dev server and production
+const allowedOrigins = [
+    'http://localhost:5173',
+    'http://127.0.0.1:5173',
+    config.cors.origin
+].filter(Boolean);
+
 app.use(
     cors({
-        origin: config.cors.origin,
+        origin: (origin, callback) => {
+            // Allow requests with no origin (like mobile apps or curl requests)
+            if (!origin) return callback(null, true);
+
+            // Check if origin is allowed
+            if (allowedOrigins.includes('*') || allowedOrigins.includes(origin)) {
+                callback(null, true);
+            } else {
+                callback(new Error('Not allowed by CORS'));
+            }
+        },
         credentials: true,
     })
 );
@@ -94,6 +117,19 @@ app.use('/api/progress', progressRoutes);
 app.use('/api/modules', modulesRoutes);
 app.use('/api/quizzes', quizzesRoutes);
 app.use('/api/learning-progress', learningProgressRoutes);
+
+// Serve static files from React build (production only)
+if (config.env === 'production') {
+    const distPath = path.join(__dirname, '..', 'dist');
+
+    // Serve static files
+    app.use(express.static(distPath));
+
+    // Handle client-side routing - serve index.html for all non-API routes
+    app.get('*', (req, res) => {
+        res.sendFile(path.join(distPath, 'index.html'));
+    });
+}
 
 // Error Handling
 app.use(notFound);

@@ -8,6 +8,8 @@
     "dev:frontend": "vite",
     "dev:backend": "node --watch ./backend/server.js",
     "build": "vite build",
+    "build:full": "vite build && echo Build complete! Run 'npm start' to serve on port 3000",
+    "start": "NODE_ENV=production node ./backend/server.js",
     "lint": "eslint .",
     "preview": "vite preview",
     "backend": "node ./backend/server.js",
@@ -15,6 +17,7 @@
     "grant:admin": "node scripts/grant-admin.mjs",
     "check:db": "node scripts/check-db.mjs",
     "test:api": "node scripts/test-api.mjs",
+    "test:proxy": "node scripts/test-proxy.mjs",
     "init:db": "node scripts/init-db.mjs"
   },
   "dependencies": {

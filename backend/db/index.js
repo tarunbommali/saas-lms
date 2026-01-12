@@ -60,7 +60,7 @@ const createTablesStatements = [
     short_description TEXT,
     instructor VARCHAR(191),
     instructor_bio TEXT,
-    thumbnail TEXT,
+    thumbnail TEXT, 
     banner_image TEXT,
     preview_video TEXT,
     price INT NOT NULL,
