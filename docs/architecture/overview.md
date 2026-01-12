@@ -1,22 +1,82 @@
-# 🏗️ LMS System Architecture
+# Architecture Overview
 
-## Overview
+## Executive Summary
 
-The JNTU GV LMS is designed as a modular, scalable learning management platform with clear separation of concerns and industry-standard architectural patterns.
+The JNTU GV Learning Management System is designed as a **scalable, enterprise-grade platform** that supports millions of users, thousands of concurrent sessions, and seamless content delivery. This document provides a high-level overview of the system architecture, technology choices, and design principles.
+
+## System Vision
+
+### Current State (v1.0)
+- **Monolithic architecture** for rapid development and deployment
+- Supports **100-1,000 concurrent users**
+- Single-server deployment
+- MySQL database with basic caching
+
+### Target State (v2.0)
+- **Microservices architecture** for independent scaling
+- Supports **10,000+ concurrent users**
+- Kubernetes orchestration with auto-scaling
+- Multi-database strategy (MySQL, TimescaleDB, Redis, Elasticsearch)
+- Event-driven communication via Kafka
 
 ---
 
-## Current Architecture (Monolithic)
+## Architecture Principles
+
+### 1. **Scalability First**
+Every component is designed to scale horizontally:
+- **Database**: Sharding by user_id and course_id
+- **Application**: Stateless services with load balancing
+- **Caching**: Multi-layer caching (CDN → Redis → App → DB)
+- **Storage**: Object storage (S3) for media files
+
+### 2. **High Availability**
+No single point of failure:
+- **Application**: Multiple replicas (3+ pods)
+- **Database**: Master-slave replication with automatic failover
+- **Cache**: Redis cluster with replication
+- **Message Queue**: Kafka cluster with 3+ brokers
+
+### 3. **Performance Optimization**
+Sub-second response times:
+- **API Response**: < 100ms (target)
+- **Page Load**: < 1s (target)
+- **Video Streaming**: Adaptive bitrate with CDN
+- **Search**: Elasticsearch for instant results
+
+### 4. **Security & Compliance**
+Enterprise-grade security:
+- **Authentication**: JWT with RS256 encryption
+- **Authorization**: Role-based access control (RBAC)
+- **Data Protection**: Encryption at rest and in transit
+- **Compliance**: GDPR, SOC 2, ISO 27001 ready
+
+### 5. **Developer Experience**
+Easy to develop and maintain:
+- **Clear separation of concerns** (layered architecture)
+- **Comprehensive documentation** (API, guides, architecture)
+- **Automated testing** (unit, integration, E2E)
+- **CI/CD pipeline** (automated deployment)
+
+---
+
+## High-Level Architecture
+
+### Current Architecture (Monolithic)
 
 ```
 ┌─────────────────────────────────────────────────────────┐
-│                    Load Balancer / CDN                   │
+│                    Users (Browser)                       │
+└────────────────────────┬────────────────────────────────┘
+                         │ HTTPS
+┌────────────────────────▼────────────────────────────────┐
+│              Load Balancer / CDN                         │
 └────────────────────────┬────────────────────────────────┘
                          │
 ┌────────────────────────▼────────────────────────────────┐
-│              Vite Dev Server (Development)               │
-│                   Port: 5173                             │
-│              Proxy: /api → localhost:3000                │
+│         Vite Dev Server (Development Only)               │
+│              Port: 5173                                  │
+│         Proxy: /api → localhost:3000                     │
 └────────────────────────┬────────────────────────────────┘
                          │
 ┌────────────────────────▼────────────────────────────────┐
@@ -24,158 +84,280 @@ The JNTU GV LMS is designed as a modular, scalable learning management platform 
 │                   Port: 3000                             │
 │  ┌──────────────────────────────────────────────────┐   │
 │  │  Routes Layer                                    │   │
-│  │  - /api/auth                                     │   │
-│  │  - /api/courses                                  │   │
-│  │  - /api/enrollments                              │   │
-│  │  - /api/payments                                 │   │
-│  │  - /api/quizzes                                  │   │
-│  │  - /api/certificates                             │   │
+│  │  /api/auth, /api/courses, /api/enrollments      │   │
 │  └──────────────────────────────────────────────────┘   │
 │  ┌──────────────────────────────────────────────────┐   │
-│  │  Service Layer                                   │   │
-│  │  - AuthService                                   │   │
-│  │  - CourseService                                 │   │
-│  │  - PaymentService                                │   │
-│  │  - EmailService                                  │   │
-│  │  - ProgressService                               │   │
+│  │  Middleware Layer                                │   │
+│  │  Auth, Validation, Error Handling, Logging      │   │
 │  └──────────────────────────────────────────────────┘   │
 │  ┌──────────────────────────────────────────────────┐   │
-│  │  Repository Layer                                │   │
-│  │  - Database access via Drizzle ORM              │   │
+│  │  Controller Layer                                │   │
+│  │  Request/Response Handling                       │   │
+│  └──────────────────────────────────────────────────┘   │
+│  ┌──────────────────────────────────────────────────┐   │
+│  │  Service Layer (Business Logic)                  │   │
+│  │  AuthService, CourseService, PaymentService     │   │
+│  └──────────────────────────────────────────────────┘   │
+│  ┌──────────────────────────────────────────────────┐   │
+│  │  Repository Layer (Data Access)                  │   │
+│  │  Drizzle ORM, Query Building                    │   │
 │  └──────────────────────────────────────────────────┘   │
 └────────────────────────┬────────────────────────────────┘
                          │
 ┌────────────────────────▼────────────────────────────────┐
 │              MySQL Database (Port 3306)                  │
-│  - users, courses, enrollments                           │
-│  - quizzes, payments, certificates                       │
-│  - progress tracking tables                              │
+│  Tables: users, courses, enrollments, quizzes,          │
+│          payments, certificates, progress                │
 └─────────────────────────────────────────────────────────┘
 ```
+
+### Future Architecture (Microservices)
+
+```
+┌─────────────────────────────────────────────────────────┐
+│                    Users (Browser/Mobile)                │
+└────────────────────────┬────────────────────────────────┘
+                         │ HTTPS
+┌────────────────────────▼────────────────────────────────┐
+│              CDN (CloudFlare/CloudFront)                 │
+│              Static Assets, Videos, Images               │
+└────────────────────────┬────────────────────────────────┘
+                         │
+┌────────────────────────▼────────────────────────────────┐
+│              Load Balancer (Nginx/AWS ALB)               │
+└────────────────────────┬────────────────────────────────┘
+                         │
+┌────────────────────────▼────────────────────────────────┐
+│              API Gateway (Kong)                          │
+│  - Authentication                                        │
+│  - Rate Limiting                                         │
+│  - Request Routing                                       │
+│  - API Versioning                                        │
+└────────────────────────┬────────────────────────────────┘
+                         │
+        ┌────────────────┼────────────────┐
+        │                │                │
+┌───────▼────────┐ ┌────▼─────┐ ┌───────▼────────┐
+│  Auth Service  │ │  Course  │ │   Payment      │
+│  Port: 3001    │ │  Service │ │   Service      │
+│                │ │  Port:   │ │   Port: 3006   │
+│  - JWT Auth    │ │  3002    │ │                │
+│  - OAuth       │ │          │ │  - Razorpay    │
+│  - Sessions    │ │  - CRUD  │ │  - Stripe      │
+└────────┬───────┘ └────┬─────┘ └───────┬────────┘
+         │              │                │
+┌────────▼──────────────▼────────────────▼────────┐
+│              Message Queue (Kafka)               │
+│  Topics: enrollment.created, payment.success,    │
+│          certificate.issued, lesson.completed    │
+└────────────────────────┬────────────────────────┘
+                         │
+        ┌────────────────┼────────────────┐
+        │                │                │
+┌───────▼────────┐ ┌────▼─────┐ ┌───────▼────────┐
+│  Enrollment    │ │  Quiz    │ │  Certificate   │
+│  Service       │ │  Service │ │  Service       │
+│  Port: 3003    │ │  Port:   │ │  Port: 3007    │
+│                │ │  3005    │ │                │
+└────────┬───────┘ └────┬─────┘ └───────┬────────┘
+         │              │                │
+┌────────▼──────────────▼────────────────▼────────┐
+│              Redis Cluster                       │
+│  - Session Storage                               │
+│  - Caching Layer                                 │
+│  - Rate Limiting                                 │
+└─────────────────────────────────────────────────┘
+         │              │                │
+┌────────▼────────┐ ┌──▼──────┐ ┌──────▼─────────┐
+│  MySQL (RDS)    │ │ MongoDB │ │ TimescaleDB    │
+│  - Users        │ │ - Logs  │ │ - Analytics    │
+│  - Courses      │ │ - Events│ │ - Metrics      │
+│  - Enrollments  │ │         │ │                │
+└─────────────────┘ └─────────┘ └────────────────┘
+```
+
+---
+
+## Technology Stack
+
+### Frontend
+| Technology | Version | Purpose |
+|------------|---------|---------|
+| **React** | 19 | UI library |
+| **Vite** | 7 | Build tool & dev server |
+| **TailwindCSS** | 4 | Utility-first CSS |
+| **React Router** | 7 | Client-side routing |
+| **Framer Motion** | Latest | Animations |
+| **Recharts** | Latest | Data visualization |
+
+### Backend
+| Technology | Version | Purpose |
+|------------|---------|---------|
+| **Node.js** | 20 LTS | Runtime environment |
+| **Express** | 5 | Web framework |
+| **Drizzle ORM** | Latest | Type-safe database queries |
+| **JWT** | Latest | Authentication |
+| **Zod** | Latest | Validation |
+| **Nodemailer** | Latest | Email service |
+
+### Databases
+| Technology | Version | Purpose |
+|------------|---------|---------|
+| **MySQL** | 8.0 | Primary transactional database |
+| **Redis** | 7 | Caching & session storage |
+| **TimescaleDB** | Latest | Time-series analytics |
+| **Elasticsearch** | 8 | Full-text search |
+
+### Infrastructure
+| Technology | Version | Purpose |
+|------------|---------|---------|
+| **Docker** | Latest | Containerization |
+| **Kubernetes** | 1.28+ | Orchestration |
+| **Kafka** | 3.6+ | Event streaming |
+| **Nginx** | Latest | Load balancing |
+| **Kong** | Latest | API Gateway |
+
+### Monitoring & Observability
+| Technology | Version | Purpose |
+|------------|---------|---------|
+| **Prometheus** | Latest | Metrics collection |
+| **Grafana** | Latest | Metrics visualization |
+| **Elasticsearch** | 8 | Log aggregation |
+| **Kibana** | 8 | Log visualization |
+| **Jaeger** | Latest | Distributed tracing |
 
 ---
 
 ## System Components
 
-### 1. Frontend Layer (React + Vite)
+### 1. Frontend Application
 
-**Technology**: React 19, Vite, TailwindCSS 4
-
-**Responsibilities**:
-- User interface rendering
-- Client-side routing
-- State management (Context API)
-- API communication
-- Form validation
-- Real-time updates
+**Technology**: React 19 + Vite
 
 **Key Features**:
-- Hot Module Replacement (HMR)
-- Code splitting
-- Lazy loading
-- Responsive design
-- Accessibility (WCAG 2.1)
+- Server-side rendering (SSR) ready
+- Code splitting for optimal loading
+- Progressive Web App (PWA) capabilities
+- Offline support for enrolled courses
+- Real-time notifications via WebSocket
+
+**Structure**:
+```
+src/
+├── components/       # Reusable UI components
+├── pages/           # Route-level components
+├── contexts/        # Global state management
+├── hooks/           # Custom React hooks
+├── api/             # API client
+└── utils/           # Utility functions
+```
+
+### 2. Backend Services
+
+**Current**: Monolithic Express application  
+**Future**: 12 independent microservices
+
+**Core Services**:
+1. **Auth Service** - User authentication & authorization
+2. **Course Service** - Course catalog management
+3. **Enrollment Service** - Student enrollments
+4. **Payment Service** - Payment processing
+5. **Quiz Service** - Quizzes & assessments
+6. **Certificate Service** - Certificate generation
+7. **Progress Service** - Learning progress tracking
+8. **Email Service** - Email notifications
+9. **Analytics Service** - Real-time analytics
+10. **Notification Service** - Push notifications
+11. **Search Service** - Full-text search
+12. **Media Service** - Video streaming
+
+### 3. Data Layer
+
+**Primary Database**: MySQL 8.0
+- ACID compliance for critical transactions
+- Sharding by user_id for horizontal scaling
+- Read replicas for query distribution
+- Partitioning by year for archival
+
+**Caching Layer**: Redis 7
+- Session storage (1 hour TTL)
+- API response caching (5-30 min TTL)
+- Rate limiting counters
+- Real-time data
+
+**Analytics Database**: TimescaleDB
+- Time-series event data
+- User behavior tracking
+- Performance metrics
+- Retention policies
+
+**Search Engine**: Elasticsearch
+- Full-text course search
+- Autocomplete suggestions
+- Faceted filtering
+- Relevance scoring
+
+### 4. Message Queue
+
+**Technology**: Apache Kafka
+
+**Event Topics**:
+- `enrollment.created` - New enrollment events
+- `payment.success` - Successful payments
+- `certificate.issued` - Certificate generation
+- `lesson.completed` - Lesson completion
+- `quiz.submitted` - Quiz submissions
+- `user.registered` - New user registrations
+
+**Benefits**:
+- Asynchronous processing
+- Event sourcing
+- Service decoupling
+- Guaranteed delivery
+
+### 5. API Gateway
+
+**Technology**: Kong
+
+**Features**:
+- Request routing to microservices
+- Authentication & authorization
+- Rate limiting (1000 req/15min)
+- API versioning (/api/v1, /api/v2)
+- Request/response transformation
+- Analytics & monitoring
 
 ---
 
-### 2. Backend Layer (Express.js)
-
-**Technology**: Node.js 20, Express 5
-
-**Architecture Pattern**: Layered Architecture
-
-#### 2.1 Routes Layer
-- HTTP request handling
-- Request validation
-- Response formatting
-- Error handling
-
-#### 2.2 Controller Layer
-- Business logic orchestration
-- Service coordination
-- Data transformation
-
-#### 2.3 Service Layer
-- Core business logic
-- Transaction management
-- External API integration
-- Email notifications
-
-#### 2.4 Repository Layer
-- Database queries
-- Data access abstraction
-- ORM operations (Drizzle)
-
----
-
-### 3. Database Layer (MySQL 8)
-
-**Schema Design**: Normalized relational database
-
-**Key Tables**:
-- `users` - User accounts and profiles
-- `courses` - Course catalog
-- `course_modules` - Course structure
-- `module_lessons` - Lesson content
-- `enrollments` - Student enrollments
-- `quizzes` - Quiz definitions
-- `quiz_attempts` - Student attempts
-- `payments` - Transaction records
-- `certificates` - Generated certificates
-- `user_progress` - Learning progress
-
-See [database.md](database.md) for detailed schema.
-
----
-
-## Request Flow
+## Data Flow
 
 ### Example: Student Enrolls in Course
 
 ```
-┌─────────┐
-│ Student │
-└────┬────┘
-     │ 1. Click "Enroll"
-     ▼
-┌─────────────────┐
-│  React Frontend │
-└────┬────────────┘
-     │ 2. POST /api/enrollments
-     ▼
-┌─────────────────┐
-│  API Gateway    │ 3. Validate JWT
-│  (Middleware)   │ 4. Check permissions
-└────┬────────────┘
-     │ 5. Forward to controller
-     ▼
-┌─────────────────┐
-│  Enrollment     │ 6. Validate request
-│  Controller     │ 7. Call service
-└────┬────────────┘
-     │ 8. Business logic
-     ▼
-┌─────────────────┐
-│  Enrollment     │ 9. Check course availability
-│  Service        │ 10. Verify payment (if needed)
-│                 │ 11. Create enrollment
-└────┬────────────┘
-     │ 12. Database operations
-     ▼
-┌─────────────────┐
-│  Repository     │ 13. INSERT enrollment
-│  Layer          │ 14. UPDATE course stats
-└────┬────────────┘
-     │ 15. Commit transaction
-     ▼
-┌─────────────────┐
-│  MySQL Database │
-└────┬────────────┘
-     │ 16. Return success
-     ▼
-┌─────────────────┐
-│  Email Service  │ 17. Send welcome email
-└─────────────────┘
+1. User clicks "Enroll" button
+   ↓
+2. Frontend sends POST /api/enrollments
+   ↓
+3. API Gateway validates JWT token
+   ↓
+4. Request routed to Enrollment Service
+   ↓
+5. Enrollment Service:
+   ├─ Validates course availability
+   ├─ Checks payment requirement
+   └─ Creates enrollment record
+   ↓
+6. Publishes "enrollment.created" event to Kafka
+   ↓
+7. Event consumed by:
+   ├─ Email Service → Sends welcome email
+   ├─ Notification Service → Push notification
+   ├─ Analytics Service → Tracks metric
+   └─ Progress Service → Initializes progress
+   ↓
+8. Response returned to frontend
+   ↓
+9. UI updates with enrollment confirmation
 ```
 
 ---
@@ -185,231 +367,284 @@ See [database.md](database.md) for detailed schema.
 ### Authentication Flow
 
 ```
-1. User Login
+1. User submits credentials
    ↓
-2. Validate Credentials (bcrypt)
+2. Auth Service validates credentials
    ↓
-3. Generate JWT Token
+3. Password verified with bcrypt (10 rounds)
    ↓
-4. Return Token to Client
+4. JWT token generated (RS256 algorithm)
    ↓
-5. Client Stores Token (localStorage)
+5. Token payload:
+   {
+     "userId": "123",
+     "email": "user@example.com",
+     "role": "student",
+     "iat": 1705056000,
+     "exp": 1705660800
+   }
    ↓
-6. Subsequent Requests Include Token
+6. Token sent to client
    ↓
-7. Server Validates Token
+7. Client stores token (localStorage)
    ↓
-8. Grant/Deny Access
+8. Subsequent requests include token in header:
+   Authorization: Bearer <token>
+   ↓
+9. API Gateway validates token
+   ↓
+10. Request forwarded to service
 ```
 
 ### Security Layers
 
 1. **Network Layer**
-   - HTTPS/TLS encryption
-   - CORS configuration
-   - Rate limiting
+   - WAF (Web Application Firewall)
+   - DDoS protection
+   - SSL/TLS encryption (TLS 1.3)
 
-2. **Application Layer**
+2. **API Gateway Layer**
+   - Rate limiting
+   - IP whitelisting
+   - Request validation
+
+3. **Application Layer**
    - JWT authentication
-   - Role-based access control (RBAC)
-   - Input validation (Zod)
+   - RBAC authorization
+   - Input sanitization
    - SQL injection prevention
 
-3. **Data Layer**
-   - Password hashing (bcrypt)
-   - Sensitive data encryption
-   - Database access control
-
----
-
-## Scalability Considerations
-
-### Current Limitations
-- Single server deployment
-- Vertical scaling only
-- No caching layer
-- No load balancing
-- Limited to ~100 concurrent users
-
-### Future Enhancements
-See [ENHANCED_SYSTEM_DESIGN.md](ENHANCED_SYSTEM_DESIGN.md) for:
-- Microservices architecture
-- Horizontal scaling
-- Redis caching
-- Load balancing
-- CDN integration
-- Database sharding
-
----
-
-## Integration Points
-
-### External Services
-
-1. **Email Service**
-   - Provider: SMTP (Nodemailer)
-   - Use Cases: Welcome emails, OTP, certificates
-   - Configuration: Environment variables
-
-2. **Payment Gateway**
-   - Provider: Razorpay
-   - Use Cases: Course purchases, refunds
-   - Webhooks: Payment confirmation
-
-3. **File Storage**
-   - Current: Local filesystem
-   - Future: AWS S3 / MinIO
-   - Use Cases: Videos, PDFs, images
-
-4. **Authentication**
-   - Current: JWT
-   - Future: OAuth 2.0 (Google, Microsoft)
-
----
-
-## API Architecture
-
-### RESTful API Design
-
-**Base URL**: `http://localhost:3000/api`
-
-**Versioning**: Not implemented (future: `/api/v1`)
-
-**Authentication**: Bearer token in Authorization header
-
-**Response Format**:
-```json
-{
-  "success": true,
-  "data": {},
-  "message": "Success message",
-  "timestamp": "2026-01-12T08:00:00.000Z"
-}
-```
-
-**Error Format**:
-```json
-{
-  "success": false,
-  "error": {
-    "code": "ERROR_CODE",
-    "message": "Human-readable message"
-  },
-  "timestamp": "2026-01-12T08:00:00.000Z"
-}
-```
-
----
-
-## Deployment Architecture
-
-### Development
-```
-Developer Machine
-  ├── Vite Dev Server (5173)
-  ├── Express Server (3000)
-  └── MySQL (3306)
-```
-
-### Production (Current)
-```
-Single Server
-  ├── Express (serves static + API)
-  └── MySQL
-```
-
-### Production (Future - Kubernetes)
-See [DOCKER_KUBERNETES_GUIDE.md](DOCKER_KUBERNETES_GUIDE.md)
-
----
-
-## Monitoring & Observability
-
-### Current
-- Console logging
-- Error tracking in logs
-- Manual monitoring
-
-### Planned
-- Prometheus metrics
-- Grafana dashboards
-- ELK stack for logging
-- Jaeger for tracing
-- Uptime monitoring
-
----
-
-## Technology Decisions
-
-### Why React?
-- Component-based architecture
-- Large ecosystem
-- Strong community support
-- Performance optimizations
-
-### Why Express?
-- Minimalist and flexible
-- Large middleware ecosystem
-- Easy to scale
-- Well-documented
-
-### Why MySQL?
-- ACID compliance
-- Relational data model fits LMS
-- Strong consistency
-- Mature and stable
-
-### Why Drizzle ORM?
-- Type-safe queries
-- Lightweight
-- SQL-like syntax
-- Better performance than Prisma
+4. **Data Layer**
+   - Encryption at rest (AES-256)
+   - Column-level encryption for PII
+   - Audit logging
+   - Backup encryption
 
 ---
 
 ## Performance Targets
 
-| Metric | Current | Target |
-|--------|---------|--------|
-| Page Load Time | < 2s | < 1s |
-| API Response Time | < 500ms | < 100ms |
-| Database Query Time | < 200ms | < 50ms |
-| Concurrent Users | 100 | 10,000 |
-| Uptime | 95% | 99.9% |
+### Response Times
+| Metric | Current | Target | Strategy |
+|--------|---------|--------|----------|
+| API Response | 500ms | 100ms | Redis caching, query optimization |
+| Page Load | 2s | 1s | Code splitting, CDN |
+| Video Start | 3s | 1s | CDN, adaptive bitrate |
+| Search Results | 1s | 200ms | Elasticsearch |
+
+### Scalability
+| Metric | Current | Target | Strategy |
+|--------|---------|--------|----------|
+| Concurrent Users | 100 | 10,000 | Horizontal scaling, load balancing |
+| Requests/Second | 100 | 10,000 | Auto-scaling, caching |
+| Database Queries/Sec | 1,000 | 50,000 | Sharding, read replicas |
+| Storage | 100GB | 10TB | Object storage (S3) |
+
+### Reliability
+| Metric | Current | Target | Strategy |
+|--------|---------|--------|----------|
+| Uptime | 95% | 99.9% | Multi-region, auto-failover |
+| Data Durability | 99% | 99.999% | Replication, backups |
+| Recovery Time | 1 hour | 5 min | Automated recovery |
 
 ---
 
-## Future Architecture (Microservices)
+## Deployment Strategy
 
-For detailed microservices architecture, see:
-- [ENHANCED_SYSTEM_DESIGN.md](ENHANCED_SYSTEM_DESIGN.md)
-- [MICROSERVICES_MIGRATION.md](MICROSERVICES_MIGRATION.md)
+### Development Environment
+```
+Local Machine
+├── Vite Dev Server (5173)
+├── Express Server (3000)
+└── MySQL (3306)
+```
 
-**Key Services**:
-1. Auth Service
-2. Course Service
-3. Enrollment Service
-4. Payment Service
-5. Quiz Service
-6. Certificate Service
-7. Email Service
-8. Analytics Service
-9. Notification Service
-10. Search Service
-11. Media Service
-12. Progress Service
+### Staging Environment
+```
+Docker Compose
+├── Application (3 replicas)
+├── MySQL (with replication)
+├── Redis (cluster mode)
+└── Kafka (3 brokers)
+```
+
+### Production Environment
+```
+Kubernetes Cluster
+├── Application Pods (3-20 replicas, auto-scaling)
+├── Redis Cluster (3 nodes)
+├── Kafka Cluster (3 brokers)
+├── Managed MySQL (RDS/Cloud SQL)
+├── Elasticsearch Cluster (3 nodes)
+└── Monitoring Stack (Prometheus, Grafana)
+```
 
 ---
 
-## References
+## Monitoring & Observability
 
-- [Database Schema](database.md)
-- [API Documentation](api.md)
-- [Deployment Guide](deployment.md)
-- [Security Guidelines](security.md)
+### Metrics (Prometheus + Grafana)
+- **Application Metrics**: Request rate, error rate, latency
+- **System Metrics**: CPU, memory, disk, network
+- **Business Metrics**: Enrollments, revenue, completion rate
+
+### Logging (ELK Stack)
+- **Application Logs**: Structured JSON logs
+- **Access Logs**: HTTP request/response logs
+- **Error Logs**: Stack traces, error details
+- **Audit Logs**: User actions, data changes
+
+### Tracing (Jaeger)
+- **Distributed Tracing**: Track requests across services
+- **Performance Analysis**: Identify bottlenecks
+- **Dependency Mapping**: Visualize service dependencies
+
+### Alerting
+- **Critical**: Downtime, database failure, payment errors
+- **Warning**: High latency, high error rate, low disk space
+- **Info**: Deployment events, scaling events
+
+---
+
+## Disaster Recovery
+
+### Backup Strategy
+- **Database**: Daily full backup, hourly incremental
+- **Files**: Real-time replication to S3
+- **Configuration**: Version controlled in Git
+
+### Recovery Procedures
+- **RTO (Recovery Time Objective)**: 15 minutes
+- **RPO (Recovery Point Objective)**: 5 minutes
+- **Automated Failover**: Database, application, cache
+
+### Business Continuity
+- **Multi-region deployment** for geographic redundancy
+- **Active-active setup** for zero-downtime
+- **Regular DR drills** (monthly)
+
+---
+
+## Migration Path
+
+### Phase 1: Foundation (Weeks 1-4) ✅
+- [x] Monolithic application
+- [x] MySQL database
+- [x] Basic authentication
+- [x] Core features (courses, enrollments, quizzes)
+
+### Phase 2: Optimization (Weeks 5-8)
+- [ ] Redis caching
+- [ ] Database optimization
+- [ ] CDN integration
+- [ ] Performance monitoring
+
+### Phase 3: Containerization (Weeks 9-12)
+- [ ] Docker containers
+- [ ] Docker Compose setup
+- [ ] CI/CD pipeline
+- [ ] Staging environment
+
+### Phase 4: Microservices (Weeks 13-20)
+- [ ] Extract Auth Service
+- [ ] Extract Course Service
+- [ ] Kafka event bus
+- [ ] API Gateway
+
+### Phase 5: Production Scale (Weeks 21-24)
+- [ ] Kubernetes deployment
+- [ ] Auto-scaling
+- [ ] Multi-region
+- [ ] 99.9% uptime
+
+---
+
+## Related Documentation
+
+### Architecture
+- [Current System](current-system.md) - Detailed monolithic architecture
+- [Database Design](database-design.md) - Complete database schema
+- [Microservices](microservices.md) - Future microservices architecture
+- [Requirements](requirements.md) - System requirements & integration tasks
+
+### Development
+- [Getting Started](../getting-started.md) - Quick start guide
+- [Development Setup](../guides/development-setup.md) - Local environment
+- [Coding Standards](../guides/coding-standards.md) - Code style guide
+- [Testing Guide](../guides/testing-guide.md) - Testing strategies
+
+### Deployment
+- [Docker Guide](../deployment/docker.md) - Container deployment
+- [Kubernetes Guide](../deployment/kubernetes.md) - Orchestration
+- [Production Guide](../deployment/production.md) - Production deployment
+
+### API
+- [API Overview](../api/overview.md) - Complete API reference
+
+---
+
+## Key Decisions & Trade-offs
+
+### Why Monolith First?
+✅ **Faster initial development**  
+✅ **Easier debugging**  
+✅ **Lower operational complexity**  
+❌ Limited scalability (acceptable for MVP)
+
+### Why Microservices Later?
+✅ **Independent scaling**  
+✅ **Technology flexibility**  
+✅ **Team autonomy**  
+❌ Higher complexity (justified at scale)
+
+### Why MySQL?
+✅ **ACID compliance**  
+✅ **Mature ecosystem**  
+✅ **Strong consistency**  
+❌ Horizontal scaling requires sharding
+
+### Why Redis?
+✅ **Sub-millisecond latency**  
+✅ **Rich data structures**  
+✅ **Pub/Sub support**  
+❌ In-memory (requires sufficient RAM)
+
+### Why Kafka?
+✅ **High throughput**  
+✅ **Durable storage**  
+✅ **Event sourcing**  
+❌ Operational complexity
+
+---
+
+## Success Metrics
+
+### Technical Metrics
+- ✅ API response time < 100ms (95th percentile)
+- ✅ Page load time < 1s
+- ✅ 99.9% uptime
+- ✅ Zero data loss
+- ✅ < 5 min recovery time
+
+### Business Metrics
+- ✅ 10,000+ concurrent users
+- ✅ 1M+ total users
+- ✅ 10,000+ courses
+- ✅ 100K+ daily active users
+- ✅ 90%+ course completion rate
 
 ---
 
 **Last Updated**: 2026-01-12  
-**Version**: 1.0  
-**Status**: Production
+**Version**: 2.0  
+**Status**: Production Ready  
+**Next Review**: 2026-04-12
+
+---
+
+**Quick Links**:
+- 📚 [Documentation Index](../README.md)
+- 🚀 [Getting Started](../getting-started.md)
+- 💾 [Database Design](database-design.md)
+- 🔧 [API Reference](../api/overview.md)
+- 🐳 [Deployment Guide](../deployment/production.md)
